@@ -1,0 +1,26 @@
+{
+  "name": "true-calc",
+  "author": "0tshelnik",
+  "version": "1.0.0",
+  "keywords": ["pebble-app"],
+  "private": true,
+  "dependencies": {},
+  "pebble": {
+    "displayName": "true-calc",
+    "uuid": "3dfa2765-38b8-4f93-8447-cb57b6beaa1b",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "aplite"
+    ],
+    "watchapp": {
+      "watchface": false
+    },
+    "messageKeys": [
+      "dummy"
+    ],
+    "resources": {
+      "media": []
+    }
+  }
+}

@@ -1,5 +1,23 @@
+#include <pebble.h>
+
 #include "item_menu.h"
-#include "item_menu_.h"
+
+#define ITEM_MENU_CB_DATA(layer) ((struct imCallbackData *)layer_get_data(layer))
+
+#define MAX(x, y) (((x) > (y)) ? (x) : (y))
+
+struct imCallbackData {
+    ItemMenuLayer *iml;
+    imItemCountCallback countCb;
+    imItemTitleCallback titleCb;
+};
+
+static void imUpdateProc(Layer *layer, GContext *ctx);
+static void imClickConfig(void *context);
+static void imUpClick(ClickRecognizerRef recognizer, void *context);
+static void imDownClick(ClickRecognizerRef recognizer, void *context);
+static void imSelectClick(ClickRecognizerRef recognizer, void *context);
+static void imBackClick(ClickRecognizerRef recognizer, void *context);
 
 static void imClickConfig(void *context) {
     window_single_repeating_click_subscribe(BUTTON_ID_UP, 150, imUpClick);

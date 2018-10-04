@@ -7,13 +7,12 @@
 import re
 import os
 
-top='.'
-build='build'
-srcdir='src/c'
-test_file_prefix='test_'
-remake_tests_cmd='cd \'{}\' \
-&& make -qf Maketests \
-|| make -f Maketests'.format(srcdir)
+top = '.'
+build = 'build'
+srcdir = 'src'
+testdir = 'tests'
+test_file_prefix ='test_'
+remake_tests_cmd ='cd \'{}\' && make -q || make'.format(testdir)
 
 def options(ctx):
     ctx.load('pebble_sdk')

@@ -336,9 +336,10 @@ double eval_expr(array tokens, int operator_order) {
                     if (!nested && operator_order == 3)
                     { otoken = iter; oindex = indx; }
                     break;
-                case OLCall:  // no break!
+                case OLCall:
                     if (!nested && operator_order == 5)
                     { otoken = iter; oindex = indx; }
+                    // no break
                 case OLp:
                     nested += 1;
                     break;

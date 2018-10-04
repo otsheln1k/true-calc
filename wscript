@@ -34,8 +34,8 @@ def configure(ctx):
         print('building tests failed')
         return
     test_bin_regex = re.compile(r'^{}[^\.]+$'.format(test_file_prefix))
-    for fn in (os.path.join(os.getcwd(), srcdir, fn)
-               for fn in os.listdir(srcdir)
+    for fn in (os.path.join(os.getcwd(), testdir, fn)
+               for fn in os.listdir(testdir)
                if test_bin_regex.match(fn)):
         if os.system(fn):
             print('test failed: {}'.format(fn))
@@ -60,7 +60,7 @@ def build(ctx):
         ctx.env = ctx.all_envs[platform]
         ctx.set_group(ctx.env.PLATFORM_NAME)
         app_elf = '{}/pebble-app.elf'.format(ctx.env.BUILD_DIR)
-        ctx.env.CFLAGS.extend(['-D', '__PEBBLE__'])
+        ctx.env.CFLAGS.extend(['-D', '__PEBBLE__', "-Wimplicit-fallthrough=1"])
         ctx.pbl_build(
             source=ctx.path.ant_glob(
                 os.path.join(srcdir, '**/*.c'),

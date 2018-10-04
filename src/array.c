@@ -1,304 +1,320 @@
+#include <stdlib.h>
+#include <string.h>
+
+#define NEW_FOR_ARRAY
 #include "array.h"
 
-#define SIZE_SIZE sizeof(size_t)
-#define SIZE_UINT sizeof(unsigned int)
-#define SIZE_ADDR sizeof(void *)
 
-/* Array head: <size_t size of element><unsigned int length><void * next address> */
-/* Array item: <void * next address><<size of elt>B elt> */
+// CONSTRUCTORS
 
-
-static void setArrayLength(array arr, unsigned int newLength);
-static void *getArrayItem(array arr, unsigned int index);
-static void _setArrayItemValue(void *item, void *elt, size_t elt_size);
-static void *makeNewArrayItem(size_t elt_size);
-
-
-array makeArray(size_t elt_size) {
-    array arr = (array) malloc(SIZE_SIZE + SIZE_UINT + SIZE_ADDR);
-    if (arr == NULL) {
+struct array_head *makeArray(size_t elt_size)
+{
+    struct array_head *arr = malloc(sizeof(*arr));
+    if (arr == NULL)
         return NULL;
-    }
-    memcpy(arr, &elt_size, SIZE_SIZE);
-    memset(arr + SIZE_SIZE, 0, SIZE_UINT);
-    memset(arr + SIZE_SIZE + SIZE_UINT, 0, SIZE_ADDR);
+    *arr = (struct array_head){
+        .elt_size = elt_size,
+        .length = 0,
+        .first = NULL,
+    };
+
     return arr;
 }
 
-array convertedArray(void *carray, unsigned int len, size_t elt_size) {
-    array arr = makeArray(elt_size);
-    unsigned int i;
-    for (i = 0; i < len; i++) {
-        arrayAppend(arr, carray + (elt_size * i));
-    }
-    return arr;
-}
-
-array arraySlice(array arr, unsigned int stt, unsigned int end) {
-    array res = makeArray(getArrayElementSize(arr));
-    setArrayLength(res, end - stt);
-    void *item = getArrayItem(arr, stt);
-    memcpy(res + SIZE_SIZE + SIZE_UINT, &item, SIZE_ADDR);
-    return res;
-}
-
-array arrayDetached(array arr) {
-    unsigned int idx = 0;
-    unsigned int len = getArrayLength(arr);
-    size_t esz = getArrayElementSize(arr);
-    void *previtm;
-    for (void *itm = getArrayItemValue(arr, 0);
-            idx < len;
-            itm = getArrayNextItem(itm)) {
-        void *newitm = makeNewArrayItem(esz);
-        _setArrayItemValue(newitm, itm, esz);
-        if (idx) {
-            memcpy(previtm, &newitm, SIZE_ADDR);
-        } else {  // addr of this elt should be in the header
-            memcpy(arr + SIZE_SIZE + SIZE_UINT, &newitm, SIZE_ADDR);
-        }
-        previtm = newitm;
-        idx += 1;
-    }
-    return arr;
-}
-
-array arrayCopy(array original) {
-    array res = makeArray(getArrayElementSize(original));
-    unsigned int idx = 0;
-    unsigned int len = getArrayLength(original);
-    for (void *item = getArrayItemValue(original, 0);
-            idx++ < len;
-            item = getArrayNextItem(item))
-        arrayAppend(res, item);
-    return res;
-}
-
-array arrayReversed(array arr) {
-    if (getArrayLength(arr) < 2)
-        return arr;
-    unsigned int len = getArrayLength(arr);
-    void *item0;
-    void *this_item = getArrayItemValue(arr, 0);        // item in idx=0
-    void *next_item = getArrayNextItem(this_item);      // item in idx=1
-    for (unsigned int idx = 0; idx < len - 2; idx++) {  // idx is item0 index
-        item0 = this_item;                              // idx + 0
-        this_item = next_item;                          // idx + 1
-        next_item = getArrayNextItem(this_item);        // idx + 2
-        if (idx >= 1)
-            *(void **)(this_item - SIZE_ADDR) = item0 - SIZE_ADDR;
-    }  // next_item should point to the last elt
-    item0 = getArrayItemValue(arr, 0);
-    *(void **)(getArrayNextItem(item0) - SIZE_ADDR) = next_item - SIZE_ADDR;
-    *(void **)(item0 - SIZE_ADDR) = this_item - SIZE_ADDR;  // sets the next item for item0
-    size_t elt_size = getArrayElementSize(arr);
-    void *mem = malloc(elt_size);
-    memcpy(mem, item0, elt_size);
-    _setArrayItemValue(item0 - SIZE_ADDR, next_item, elt_size);
-    _setArrayItemValue(next_item - SIZE_ADDR, mem, elt_size);
-    free(mem);
-    return arr;
-}
-
-array arrayPart(array arr, unsigned int from, unsigned int to) {
-    if (from >= to)
-        return arrayClear(arr);
-    for (unsigned int idx = 0; idx < from; idx++)
-        arrayRemove(arr, 0);
-    void *last_item_next = *(void **)getArrayItem(arr, getArrayLength(arr) - 1);
-    destroyArray(arraySlice(arr, to, getArrayLength(arr)));
-    unsigned int len = to - from;
-    setArrayLength(arr, len);
-    *(void **)getArrayItem(arr, len - 1) = last_item_next;
-    return arr;
-}
-
-void destroyArray(array arr) {
-    arrayClear(arr);
-    free(arr);
-}
-
-void destroyArrayHeader(array slc) {
-    free(slc);
-}
-
-size_t getArrayElementSize(array arr) {
-    return *(size_t *)arr;
-}
-
-unsigned int getArrayLength(array arr) {
-    void *plc = arr + SIZE_SIZE;
-    return *((unsigned int *)plc);
-}
-
-static void setArrayLength(array arr, unsigned int newLength) {
-    memcpy(arr + SIZE_SIZE, &newLength, sizeof(unsigned int));
-}
-
-static void *getArrayItem(array arr, unsigned int index) {
-    if (index > getArrayLength(arr)) {
-        return NULL;
-    }
-    unsigned int i;
-    for (i = 0; i < index + 1; i++) {
-        if (i == 0) {
-            arr = *(void **)(arr + SIZE_SIZE + SIZE_UINT);
-        } else {
-            arr = *(void **)arr;
-        }
-    }
-    return arr;
-}
-
-void *getArrayItemValue(array arr, unsigned int index) {
-    return getArrayItem(arr, index) + SIZE_ADDR;
-}
-
-void *getArrayNextItem(void *arritem) {
-    return *(void **)(arritem - SIZE_ADDR) + SIZE_ADDR;
-}
-
-static void _setArrayItemValue(void *item, void *elt, size_t elt_size) {
-    memcpy(item + SIZE_ADDR, elt, elt_size);
-}
-
-void setArrayItemValue(array arr, unsigned int index, void *elt) {
-    size_t elt_size = getArrayElementSize(arr);
-    void *item = getArrayItem(arr, index);
-    _setArrayItemValue(item, elt, elt_size);
-}
-
-static void *makeNewArrayItem(size_t elt_size) {
-    void *item = malloc(SIZE_ADDR + elt_size);
-    void *addr = NULL;
-    memcpy(item, &addr, SIZE_ADDR);
+static struct array_item *makeNewArrayItem(size_t elt_size) {
+    struct array_item *item = malloc(sizeof(*item) + elt_size);
+    item->next = NULL;
     return item;
 }
 
-void arrayAppend(array arr, void *elt) {
-    unsigned int len = getArrayLength(arr);
-    size_t elt_size = getArrayElementSize(arr);
-    if (~len == 0) {
-        return;
-    }
-    void *item = makeNewArrayItem(elt_size);
-    if (item == NULL) {
-        return;
-    }
-    setArrayLength(arr, len + 1);
-    void *prev_item;
-    if (len > 0) {
-        prev_item = getArrayItem(arr, len - 1);
-    } else {
-        prev_item = arr + SIZE_SIZE + SIZE_UINT;
-    }
 
-    memset(item, 0, SIZE_ADDR);
-    memcpy(prev_item, &item, SIZE_ADDR);
-    _setArrayItemValue(item, elt, elt_size);
-}
+// CONVERTING TO/FROM C ARRAYS
 
-void arrayInsert(array arr, unsigned int index, void *elt) {
-    unsigned int len = getArrayLength(arr);
-    size_t elt_size = getArrayElementSize(arr);
-    if (~len == 0 || index > len) {
-        return;
-    }
-    void *new_item = makeNewArrayItem(elt_size);
-    if (new_item == NULL) {
-        return;
-    }
-    if (index < len) {  // has next elt
-        void *next_item = getArrayItem(arr, index);
-        memcpy(new_item, &next_item, SIZE_ADDR);
-    }
-    if (index > 0) {  // prev is elt
-        void *prev_item = getArrayItem(arr, index - 1);
-        memcpy(prev_item, &new_item, SIZE_ADDR);
-    } else {  // prev is head
-        memcpy(arr + SIZE_SIZE + SIZE_UINT, &new_item, SIZE_ADDR);
-    }
-    _setArrayItemValue(new_item, elt, elt_size);
-    setArrayLength(arr, len + 1);
-}
+struct array_head *convertedArray(void *carray,
+                                  size_t len,
+                                  size_t elt_size)
+{
+    struct array_head *arr = makeArray(elt_size);
 
-void arrayPush(array arr, void *elt) {
-    arrayInsert(arr, 0, elt);
-}
+    for (size_t i = 0; i < len; i++)
+        arrayAppend(arr, carray + i * elt_size);
 
-void arrayRemove(array arr, unsigned int index) {
-    unsigned int len = getArrayLength(arr);
-    if (index >= len || !len) { return; }
-    void *item = getArrayItem(arr, index);
-    void *next_item = index < len - 1 ? getArrayItem(arr, index + 1) : NULL;
-    if (index > 0) {  // prev is elt
-        void *prev_item = getArrayItem(arr, index - 1);
-        memcpy(prev_item, &next_item, SIZE_ADDR);
-    } else {
-        memcpy(arr + SIZE_SIZE + SIZE_UINT, &next_item, SIZE_ADDR);
-    }
-    free(item);
-    setArrayLength(arr, len - 1);
-}
-
-array arrayClear(array arr) {
-    unsigned int len = getArrayLength(arr);
-    if (!len) { return arr; }
-    unsigned int i;
-    for (i = len - 1;; i--) {
-        free(getArrayItem(arr, i));
-        if (!i) { break; }  // i is an unsigned int, so it can't be < 0.
-    }
-    setArrayLength(arr, 0);
-    memset(arr + SIZE_SIZE + SIZE_UINT, 0, SIZE_ADDR);
     return arr;
 }
 
-void *arrayJoint(array arr) {
-    // optimized
-    unsigned int len = getArrayLength(arr);
-    size_t elt_size = getArrayElementSize(arr);
-    void *a = calloc(len, elt_size);
-    unsigned int i;
-    void *item = getArrayItem(arr, 0);
-    for (i = 0; i < len; i++) {
-        memcpy(a + (i * elt_size), item + SIZE_ADDR, elt_size);
-        item = *(void **)item;
+void *arrayJoint(struct array_head * arr)
+{
+    size_t len = arr->length;
+    void *a = calloc(len, arr->elt_size);
+    size_t elt_size = arr->elt_size;
+    struct array_item *item = arr->first;
+
+    for (size_t i = 0; i < len; i++) {
+        memcpy(a + i * elt_size, item->data, elt_size);
+        item = item->next;
     }
+
     return a;
 }
 
-void arrayIter(array arr, arrayIterFunc f) {
-    // optimized; can be used as reduce and filter
-    unsigned int len = getArrayLength(arr);
-    if (!len) {
-        return;
+
+// DESTRUCTORS
+
+struct array_item *destroyArray(struct array_head *arr)
+{
+    struct array_item *item = arrayClear(arr);
+    free(arr);
+    return item;
+}
+
+void destroyArrayHeader(struct array_head *slc)
+{
+    free(slc);
+}
+
+
+// GLOBAL ACTIONS
+
+struct array_head *arraySlice(struct array_head *arr,
+                               size_t stt,
+                               size_t end)
+{
+    struct array_head *res = makeArray(arr->elt_size);
+
+    res->length = end - stt;
+    res->first = getArrayItem(arr, stt);
+
+    return res;
+}
+
+struct array_item *arrayDetach(struct array_head *arr)
+{
+    size_t idx = 0;
+    size_t len = arr->length;
+    struct array_item *previtm, *newitm, *itm;
+
+    for (itm = arr->first;
+         idx < len;
+         previtm = newitm, idx++, itm = itm->next) {
+        newitm = makeNewArrayItem(arr->elt_size);
+        memcpy(newitm->data, itm->data, arr->elt_size);
+        *(idx ? &previtm->next : &arr->first) = newitm;
     }
-    unsigned int i;
-    void *item = getArrayItem(arr, 0);
-    void *nitem;
-    for (i = 0; i < len; i++) {
-        nitem = *(void **)item;
-        if (f(arr, i, item + SIZE_ADDR)) {
+
+    return itm;
+}
+
+struct array_head *arrayCopy(struct array_head *original)
+{
+    struct array_head *res = makeArray(original->elt_size);
+
+    res->first = original->first;
+    res->length = original->length;
+    arrayDetach(res);
+
+    return res;
+}
+
+struct array_item *arrayPart(struct array_head *arr,
+                             size_t from,
+                             size_t to)
+{
+    if (from >= to)
+        return arrayClear(arr);
+
+    size_t len = to - from;
+    struct array_head *slice;
+    struct array_item *itm, *after;
+
+    // remove tail
+    slice = arraySlice(arr, to, arr->length);
+    after = destroyArray(slice);
+    // remote head
+    slice = arraySlice(arr, 0, from);
+    itm = destroyArray(slice);
+
+    arr->first = itm;
+    arr->length = len;
+
+    return after;
+}
+
+struct array_item *arrayReverse(struct array_head *arr)
+{
+    size_t len = arr->length;
+    if (len < 2)
+        return len ? arr->first->next : NULL;
+
+    struct array_item *this = arr->first->next;
+    struct array_item *next;
+
+    for (size_t idx = 1; idx < len; idx++) {
+        next = this->next;
+        arr->first->next = this->next;
+        this->next = arr->first;
+        arr->first = this;
+        this = next;
+    }
+
+    return this;
+}
+
+struct array_item *arrayReverseSaveLink(struct array_head *arr)
+{
+    struct array_item *item;
+    struct array_head *slice;
+
+    switch (arr->length) {
+    case 0:
+        return NULL;
+    case 1:
+        return arr->first->next;
+    case 2:
+        item = arr->first->next;
+        break;
+    default:
+        slice = arraySlice(arr, 1, arr->length - 1);
+        item = arrayReverse(slice);
+        arr->first->next = slice->first;
+        destroyArrayHeader(slice);
+        break;
+    }
+
+    unsigned char tmp[arr->elt_size];
+
+    memcpy(tmp, item->data, arr->elt_size);
+    memcpy(item->data, arr->first->data, arr->elt_size);
+    memcpy(arr->first->data, tmp, arr->elt_size);
+
+    return item->next;
+}
+
+struct array_item *arrayClear(struct array_head *arr)
+{
+    size_t i = arr->length;
+    struct array_item *item = arr->first, *next;
+
+    while (i--) {
+        next = item->next;
+        free(item);
+        item = next;
+    }
+
+    arr->length = 0;
+    arr->first = NULL;
+
+    return item;
+}
+
+
+// ITEMS
+
+struct array_item *getArrayItem(struct array_head *arr, size_t index)
+{
+    if (index >= arr->length)
+        return NULL;
+
+    struct array_item *item = arr->first;
+
+    for (size_t i = 0; i < index; i++, item = item->next);
+
+    return item;
+}
+
+struct array_item *arrayAppend(struct array_head * arr, void *elt)
+{
+    size_t len = arr->length;
+    struct array_item *item = makeNewArrayItem(arr->elt_size);
+
+    if (item == NULL) return NULL;
+
+    arr->length += 1;
+
+    *(len ? &getArrayItem(arr, len - 1)->next : &arr->first) = item;
+    memcpy(item->data, elt, arr->elt_size);
+
+    return item;
+}
+
+struct array_item *arrayInsert(struct array_head *arr,
+                               size_t index,
+                               void *elt)
+{
+    size_t len = arr->length;
+    if (index > len) return NULL;
+
+    struct array_item *new_item = makeNewArrayItem(arr->elt_size);
+    if (new_item == NULL) return NULL;
+
+    struct array_item *prev = index
+        ? getArrayItem(arr, index - 1) : NULL;
+    struct array_item *next = (index == len)
+        ? NULL : (index ? prev->next : arr->first);
+
+    new_item->next = next;
+    *(index ? &prev->next : &arr->first) = new_item;
+
+    memcpy(new_item->data, elt, arr->elt_size);
+    arr->length += 1;
+
+    return new_item;
+}
+
+struct array_item *arrayPush(struct array_head *arr, void *elt)
+{
+    return arrayInsert(arr, 0, elt);
+}
+
+void arrayRemove(struct array_head *arr, size_t index)
+{
+    size_t len = arr->length;
+    if (index >= len || !len) return;
+
+    struct array_item *prev_item =
+        index ? getArrayItem(arr, index - 1) : NULL;
+    struct array_item *item = index ? prev_item->next : arr->first;
+    struct array_item *next_item = (index < len - 1)
+        ? item->next : NULL;
+    *(index ? &prev_item->next : &arr->first) = next_item;
+    free(item);
+    arr->length -= 1;
+}
+
+
+// ITERATION AND SEARCHING
+
+void arrayIter(struct array_head *arr,
+               arrayIterFunc f,
+               void *user_data)
+{
+    if (!arr->length) return;
+
+    struct array_item *item = arr->first;
+    struct array_item *nitem;
+
+    for (size_t i = 0; i < arr->length; i++) {
+        nitem = item->next;
+        if (f(arr, i, item, user_data))
             break;
-        }
         item = nitem;
     }
 }
 
-unsigned int getArrayItemIndex(array arr, void *elt) {
-    size_t elt_size = getArrayElementSize(arr);
-    FOR_ARRAY_COUNTER(arr, idx, void, itm)
-        if (itm == elt || !memcmp(itm, elt, elt_size))
-            return idx;
-    return getArrayLength(arr);
-}
+struct array_item *findArrayItem(struct array_head *arr,
+                                 arrayIterFunc predicate,
+                                 void *user_data,
+                                 size_t *idx_return)
+{
+    struct array_item *itm;
+    size_t idx;
 
-void *getArrayItemByVal(array arr, void *elt) {
-    size_t elt_size = getArrayElementSize(arr);
-    FOR_ARRAY_COUNTER(arr, idx, void, itm)
-        if (itm == elt || !memcmp(itm, elt, elt_size))
+    FOR_ARRAY(arr, idx, itm)
+        if ((predicate != NULL)
+            ? predicate(arr, idx, itm, user_data)
+            : !memcmp(itm->data, user_data, arr->elt_size)) {
+            if (idx_return) *idx_return = idx;
             return itm;
+        }
+
     return NULL;
 }
-

@@ -2,7 +2,7 @@
 
 Advanced calculator for Pebble smartwatch.
 
-It was written a long time ago, w/o Git. The code isn't really nice, but I'll fix that. You can even find a singly-linked list implementation for some reason called `array` and written with pointer arithmetics instead of `struct`.
+It was written a long time ago, w/o Git. The code isn't really nice, but I'll fix that.
 
 Code in SmallMaths is from [pmath](https://github.com/editdb/Pebble-Math).
 

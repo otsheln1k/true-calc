@@ -3,6 +3,8 @@
 #include "eval.h"
 #include "calc_lib.h"
 
+#define ARG(...) __VA_ARGS__
+
 PREDEF_ONELINE_FUNC(predef_sin, args, argv,
         ARG(sm_sin(GET_DOUBLE(argv, 0))))
 

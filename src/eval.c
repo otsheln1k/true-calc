@@ -65,15 +65,15 @@ double eval_atom(Token atom) {
 }
 
 unsigned int count_var() {
-    return getListLength(vars);
+    return vars->length;
 }
 
 unsigned int count_const() {
-    return getListLength(consts);
+    return consts->length;
 }
 
 unsigned int count_func() {
-    return getListLength(funcs);
+    return funcs->length;
 }
 
 unsigned int add_var(double init_val, char *name) {
@@ -86,7 +86,7 @@ unsigned int add_var(double init_val, char *name) {
         }
     */
     listAppend(vars, &nv);
-    return getListLength(vars) - 1;
+    return vars->length - 1;
 }
 
 double get_var(unsigned int varid) {  // assumes that var with id varid already exists
@@ -116,7 +116,7 @@ unsigned int add_const(double value, char *name) {
         }
     */
     listAppend(consts, &nc);
-    return getListLength(consts) - 1;
+    return consts->length - 1;
 }
 
 double get_const(unsigned int cid) {
@@ -139,7 +139,7 @@ void remove_const(unsigned int cid) {
 unsigned int add_func(char *name) {
     DefinedFunction defun = { name, NULL, true, { NULL } };
     listAppend(funcs, &defun);
-    return getListLength(funcs) - 1;
+    return funcs->length - 1;
 }
 
 unsigned int set_func_args(unsigned int fid, struct list_head *args) {
@@ -169,7 +169,7 @@ unsigned int set_func_func(unsigned int fid, PredefFunc f) {
 }
 
 unsigned int get_func_argc(unsigned int fid) {
-    return getListLength(((DefinedFunction *)getListItemValue(funcs, fid))->args);
+    return ((DefinedFunction *)getListItemValue(funcs, fid))->args->length;
 }
 
 char *get_func_arg_name(unsigned int fid, unsigned int arg_idx) {
@@ -202,7 +202,7 @@ double call_func(unsigned int fid, struct list_head *argv) {
         return func->body.f(argv);
     struct list_head *argval = eval_all_args(argv);
     struct list_head *body = listCopy(func->body.tokens);
-    unsigned int len = getListLength(body);
+    unsigned int len = body->length;
     unsigned int idx = 0;
     for (Token *itmp = (Token *)getListItemValue(body, 0);
             idx < len;
@@ -270,7 +270,7 @@ double eval_uoperation(UOperatorType uoperation, double op) {
 
 LValue eval_lvalue(struct list_head *tokens) {
     unsigned int id = GET_TOKEN(tokens, 0).value.id;
-    if (getListLength(tokens) == 1)
+    if (tokens->length == 1)
         return (LValue){
             id,
                 false
@@ -305,7 +305,7 @@ double eval_funcall(unsigned int fid, struct list_head *args) {
 }
 
 double eval_expr(struct list_head *tokens, int operator_order) {
-    unsigned int tlen = getListLength(tokens);
+    unsigned int tlen = tokens->length;
     if (tlen == 1)
         return eval_atom(GET_TOKEN(tokens, 0));
     int nested = 0;

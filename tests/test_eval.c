@@ -59,7 +59,7 @@ bool test_eval_allArgs() {
     struct list_head *arg0 = convertedList((Token[1]){ { Number, 3. } }, 1, sizeof(Token));
     listAppend(args, &arg0);
     struct list_head *argv = eval_all_args(args);
-    bool res = ASSERT(getListLength(argv) == 1)
+    bool res = ASSERT(argv->length == 1)
             && ASSERT(*(double *)getListItemValue(argv, 0) == 3);
     destroyList(argv);
     destroyList(arg0);

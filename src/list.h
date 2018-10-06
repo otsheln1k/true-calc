@@ -69,8 +69,6 @@ struct list_item *findListItem(struct list_head *arr,
 #define FOFFSET(t, f) (((void *)&((t *)0)->f) - ((void *)0))
 
 typedef struct list_head *list;
-static inline unsigned int getListLength(struct list_head *arr)
-{ return (unsigned int)arr->length; }
 static inline void *getListItemValue(struct list_head *arr, unsigned int idx)
 { return getListItem(arr, idx)->data; }
 static inline void *getListNextItem(void *item_val)

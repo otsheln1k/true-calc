@@ -84,7 +84,7 @@ char *cs_get_token_text(CalcState *cs, Token token) {
                 return "-";
         case Arg:
             {
-                unsigned int len = getListLength(cs->fcalls);
+                unsigned int len = cs->fcalls->length;
                 return get_func_arg_name(
                         (len
                          ? ((FuncallMark *)getListItemValue(cs->fcalls, 0))->fid
@@ -150,7 +150,7 @@ void cs_modify_expect(CalcState *cs, Token *new_tok_p) {
     // defun check: ORCall, prev is Arg, cs.defun.offset == 0
     // set var check: Var, either the first token or prev is OComma or OLCall or OLp
     cs->exp &= ~(TEFRCall | TEFComma | TECloseParen | TEFArgs);
-    unsigned int len = getListLength(cs->expr);
+    unsigned int len = cs->expr->length;
     switch (new_tok_p->type) {
         case Arg:
             if (cs->scope.offset == 0)
@@ -229,7 +229,7 @@ void cs_modify_expect(CalcState *cs, Token *new_tok_p) {
     if ((new_tok_p->type != Operator || (new_tok_p->type == Operator &&
         (new_tok_p->value.op == ORp || new_tok_p->value.op == ORCall)))
      && new_tok_p->type != UOperator
-     && getListLength(cs->fcalls)
+     && cs->fcalls->length
      && cs->nesting - 1 == (fmp = ((FuncallMark *)getListItemValue(cs->fcalls, 0)))->nesting_level
      && cs->exp & TEBinaryOperator) {
         MOD_FLAGS(cs->exp, TEFRCall | TEFComma, TENone);
@@ -237,7 +237,7 @@ void cs_modify_expect(CalcState *cs, Token *new_tok_p) {
         new_tok_p->type != Operator
      && new_tok_p->type != UOperator
      && cs->nesting
-     && (!getListLength(cs->fcalls)
+     && (!cs->fcalls->length
        || cs->nesting - 1 != ((FuncallMark *)getListItemValue(cs->fcalls, 0))->nesting_level)) {
         MOD_FLAGS(cs->exp, TECloseParen, TENone);
     }
@@ -248,7 +248,7 @@ void cs_modify_expect(CalcState *cs, Token *new_tok_p) {
 bool cs_show_item(CalcState *cs, TokenItemId tii) {
     switch (tii) {
         case TIIBackspace:
-            return getListLength(cs->expr) != 0;
+            return cs->expr->length != 0;
         case TIIPlus: case TIIMinus: case TIIMultiply: case TIITrueDiv:
         case TIIFloorDiv: case TIIModulo: case TIIPower:
             return (cs->exp & TEBinaryOperator) == TEBinaryOperator;
@@ -272,7 +272,7 @@ bool cs_show_item(CalcState *cs, TokenItemId tii) {
         case TIIArg:
             return (cs->exp & TEFArgs) && (cs->scope.offset != 0);
         case TIIReturn: case TIISaveToConst: case TIISaveToNamedConst:
-            return getListLength(cs->expr)
+            return cs->expr->length
                 && !(cs->nesting)
                 && (cs->exp & TEBinaryOperator) == TEBinaryOperator;
     }
@@ -287,7 +287,7 @@ void cs_add_item(CalcState *cs, Token new_tok) {
                 {
                     static FuncallMark fm;
                     fm.nesting_level = cs->nesting;
-                    fm.fid = GET_PTOKEN(cs->expr, getListLength(cs->expr) - 1)->value.id;
+                    fm.fid = GET_PTOKEN(cs->expr, cs->expr->length - 1)->value.id;
                     fm.arg_idx = 0;
                     fid = fm.fid;  // set fid here in case of a defun
                     listPush(cs->fcalls, &fm);
@@ -309,7 +309,7 @@ void cs_add_item(CalcState *cs, Token new_tok) {
                 break;
             case OAssign:
                 {
-                    unsigned int len = getListLength(cs->expr);
+                    unsigned int len = cs->expr->length;
                     if (!len)
                         break;
                     Token *prev = GET_PTOKEN(cs->expr, len - 1);
@@ -343,7 +343,7 @@ void cs_add_item(CalcState *cs, Token new_tok) {
 
 void cs_rem_item(CalcState *cs) {
     struct list_head *expr = cs->expr;
-    unsigned int len = getListLength(expr) - 1;
+    unsigned int len = expr->length - 1;
     Token *t = GET_PTOKEN(expr, len);
     size_t slen = strlen(cs_get_token_text(cs, *t));  // value may be removed
     if (t->type == Operator)
@@ -379,7 +379,7 @@ void cs_rem_item(CalcState *cs) {
                 break;
         }
     else if (t->type != Number && t->type != UOperator
-            && getListLength(cs->names)
+            && cs->names->length
             && (((NewNameMark *)getListItemValue(cs->names, 0))->offset == len))
         // automaticaly remove the unneeded symbols here
         cs_remove_unneeded(cs);
@@ -487,7 +487,7 @@ void cs_input_newid(CalcState *cs, unsigned int id) {
         default:
             return;
     }
-    NewNameMark nnm = (NewNameMark){ getListLength(cs->expr), cs->cit, id };
+    NewNameMark nnm = (NewNameMark){ cs->expr->length, cs->cit, id };
     listPush(cs->names, &nnm);
     cs_input_id(cs, id);
 }

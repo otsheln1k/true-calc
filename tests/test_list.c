@@ -51,14 +51,14 @@ t_a_SI_ret:
 
 bool test_array_ConvSlice() {
     struct list_head *arr = convertedList((int[6]){15, 32, 2, 28, 90, 42}, 6, sizeof(int));
-    if (!ASSERT(getListLength(arr) == 6)
+    if (!ASSERT(arr->length == 6)
      || !ASSERT(GET_INT(arr, 3) == 28)) {
         bool res = false;
         goto t_a_CS_ret;
     }
     struct list_head *slc = listSlice(arr, 1, 4);
     bool res = \
-           ASSERT(getListLength(slc) == 3)
+           ASSERT(slc->length == 3)
         && ASSERT(GET_INT(slc, 0) == 32)
         && ASSERT(GET_INT(slc, 1) == 2)
         && ASSERT(GET_INT(slc, 2) == 28);
@@ -87,8 +87,8 @@ bool test_array_ConvEx() {
         goto t_a_CE_ret_2;
     }
     bool res = \
-           ASSERT(getListLength(stringarr) == 3)
-        && ASSERT(getListLength(structarr) == 4);
+           ASSERT(stringarr->length == 3)
+        && ASSERT(structarr->length == 4);
 t_a_CE_ret_2:
     destroyList(structarr);
 t_a_CE_ret_1:
@@ -240,7 +240,7 @@ bool test_array_Part() {
         && ASSERT(GET_INT(slc, 2) == 8)
         && ASSERT(GET_INT(slc, 3) == 16)
         && ASSERT(GET_INT(slc, 4) == 32)
-        && ASSERT(getListLength(slc) == 5)
+        && ASSERT(slc->length == 5)
         && ASSERT(*(int *)after->data == 128);
     destroyList(slc);
     return res;

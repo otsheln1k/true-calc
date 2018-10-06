@@ -130,7 +130,7 @@ bool test_cs_Stack() {
     cs_interact(cs, TIIFunction);
     cs_input_id(cs, fid);
     cs_interact(cs, TIILFuncall);
-    bool res = ASSERT(getListLength(cs->fcalls) == 1);
+    bool res = ASSERT(cs->fcalls->length == 1);
     if (!res) goto t_c_S_ret;
     FuncallMark *fmp = getListItemValue(cs->fcalls, 0);
     res &= ASSERT(fmp->fid == fid)
@@ -145,7 +145,7 @@ bool test_cs_Stack() {
     cs_interact(cs, TIINumber);
     cs_input_number(cs, 29.);
     cs_interact(cs, TIIRFuncall);
-    res &= ASSERT(getListLength(cs->fcalls) == 0)
+    res &= ASSERT(cs->fcalls->length == 0)
         && ASSERT(cs_eval(cs) == 42.);
 t_c_S_ret:
     cs_destroy(cs);

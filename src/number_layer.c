@@ -40,7 +40,7 @@ static void nlUpdateProc(Layer *layer, GContext *ctx) {
     bool neg = number_layer_get_negative(nl);
     // so, da plan: draw the items in reversed order :)
     // get the max size here
-    unsigned int count = neg + getListLength(nl->items) + 1;
+    unsigned int count = neg + nl->items->length + 1;
     const GSize text_size = graphics_text_layout_get_content_size(
             "__",
             font,
@@ -73,7 +73,7 @@ static void nlUpdateProc(Layer *layer, GContext *ctx) {
     graphics_context_set_text_color(ctx, GColorWhite);
     // iterate through the items
     unsigned int index = 0;
-    for (NumberLayerItem *item = getListLength(nl->items) ? getListItemValue(nl->items, 0) : &minus;
+    for (NumberLayerItem *item = nl->items->length ? getListItemValue(nl->items, 0) : &minus;
             index < (count - 1);
             item = (index < count - 1 - neg) ? getListNextItem(item) : &minus) {
         // draw items here
@@ -103,11 +103,11 @@ static bool nlShowUnderscore(NumberLayer *nl) {
 }
 
 static bool nlShowDigits(NumberLayer *nl) {
-    return !nl->identifier || getListLength(nl->items);
+    return !nl->identifier || nl->items->length;
 }
 
 static bool nlShowDone(NumberLayer *nl) {
-    return getListLength(nl->items) > 0;
+    return nl->items->length > 0;
 }
 
 static char *nlGetString(NumberLayerItem nli) {
@@ -154,8 +154,7 @@ double number_layer_get_number(NumberLayer *nl) {
     static NumberLayerItem point = NLPoint;
     unsigned int point_idx = getListItemIndex(items, &point);
     const char base = nl->base;
-    // const len = getListLength(items);
-    if (point_idx == getListLength(items))     // not present
+    if (point_idx == items->length)     // not present
         point_idx = 0;
     else if (!point_idx)                        // first item
         *(NumberLayerItem *)getListItemValue(items, point_idx) = NLZero;
@@ -169,7 +168,7 @@ double number_layer_get_number(NumberLayer *nl) {
 }
 
 char *number_layer_get_string(NumberLayer *nl) {
-    unsigned int len = getListLength(nl->items);
+    unsigned int len = nl->items->length;
     char *str = malloc(len + 1);
     FOR_LIST_COUNTER(nl->items, iidx, NumberLayerItem, item)
         str[len - 1 - iidx] = nlGetString(*item)[0];
@@ -187,7 +186,7 @@ void number_layer_next(NumberLayer *nl) {
 }
 
 void number_layer_prev(NumberLayer *nl) {
-    if (!getListLength(nl->items)) {
+    if (!nl->items->length) {
         if (nl->cncl_cb != NULL)
             nl->cncl_cb(nl, nl->cb_ctx);
         else

@@ -25,7 +25,7 @@ test_failed:
 
 bool test_cs_2() {
     CalcState *cs = cs_create();
-    unsigned int fid0 = set_func_body(set_func_args(add_func("f1"), ARRAY_CONV(char *, 1, { "p0" })), ARRAY_CONV(Token, 3, ARG({ { Arg, { .id = 0 } }, { Operator, { .op = OAdd } }, { Number, 10 } })));
+    unsigned int fid0 = set_func_body(set_func_args(add_func("f1"), LIST_CONV(char *, 1, { "p0" })), LIST_CONV(Token, 3, ARG({ { Arg, { .id = 0 } }, { Operator, { .op = OAdd } }, { Number, 10 } })));
     cs_add_item(cs, (Token){ Func, { .id = fid0 } });
     cs_add_item(cs, (Token){ Operator, { .op = OLCall } });
     cs_add_item(cs, (Token){ Number, 15 });
@@ -130,9 +130,9 @@ bool test_cs_Stack() {
     cs_interact(cs, TIIFunction);
     cs_input_id(cs, fid);
     cs_interact(cs, TIILFuncall);
-    bool res = ASSERT(getArrayLength(cs->fcalls) == 1);
+    bool res = ASSERT(getListLength(cs->fcalls) == 1);
     if (!res) goto t_c_S_ret;
-    FuncallMark *fmp = getArrayItemValue(cs->fcalls, 0);
+    FuncallMark *fmp = getListItemValue(cs->fcalls, 0);
     res &= ASSERT(fmp->fid == fid)
         && ASSERT(fmp->nesting_level == 0)
         && ASSERT(fmp->arg_idx == 0);
@@ -145,7 +145,7 @@ bool test_cs_Stack() {
     cs_interact(cs, TIINumber);
     cs_input_number(cs, 29.);
     cs_interact(cs, TIIRFuncall);
-    res &= ASSERT(getArrayLength(cs->fcalls) == 0)
+    res &= ASSERT(getListLength(cs->fcalls) == 0)
         && ASSERT(cs_eval(cs) == 42.);
 t_c_S_ret:
     cs_destroy(cs);
@@ -319,7 +319,7 @@ t_c_E3_ret:
 int main() {
     init_calc();
     fid = set_func_func(set_func_args(add_func("tf1+"),
-                ARRAY_CONV(char *, 2, ARG({ "x", "y" }))),
+                LIST_CONV(char *, 2, ARG({ "x", "y" }))),
             test_func_oneplus);
     bool res = test_cs_1()
             && test_cs_ftoa()

@@ -40,7 +40,7 @@ static void nlUpdateProc(Layer *layer, GContext *ctx) {
     bool neg = number_layer_get_negative(nl);
     // so, da plan: draw the items in reversed order :)
     // get the max size here
-    unsigned int count = neg + getArrayLength(nl->items) + 1;
+    unsigned int count = neg + getListLength(nl->items) + 1;
     const GSize text_size = graphics_text_layout_get_content_size(
             "__",
             font,
@@ -73,11 +73,11 @@ static void nlUpdateProc(Layer *layer, GContext *ctx) {
     graphics_context_set_text_color(ctx, GColorWhite);
     // iterate through the items
     unsigned int index = 0;
-    for (NumberLayerItem *item = getArrayLength(nl->items) ? getArrayItemValue(nl->items, 0) : &minus;
+    for (NumberLayerItem *item = getListLength(nl->items) ? getListItemValue(nl->items, 0) : &minus;
             index < (count - 1);
-            item = (index < count - 1 - neg) ? getArrayNextItem(item) : &minus) {
+            item = (index < count - 1 - neg) ? getListNextItem(item) : &minus) {
         // draw items here
-        // if index is out of item-array's bounds, draw minus
+        // if index is out of item-list's bounds, draw minus
         cur_rect.origin.x -= blck_size.w + margin;
         graphics_fill_rect(ctx, cur_rect, 0, 0);
         graphics_draw_text(ctx,
@@ -95,7 +95,7 @@ static bool nlShowDecimalPoint(NumberLayer *nl) {
     if (nl->identifier)
         return false;
     static NumberLayerItem point = NLPoint;
-    return getArrayItemByVal(nl->items, &point) == NULL;
+    return getListItemByVal(nl->items, &point) == NULL;
 }
 
 static bool nlShowUnderscore(NumberLayer *nl) {
@@ -103,11 +103,11 @@ static bool nlShowUnderscore(NumberLayer *nl) {
 }
 
 static bool nlShowDigits(NumberLayer *nl) {
-    return !nl->identifier || getArrayLength(nl->items);
+    return !nl->identifier || getListLength(nl->items);
 }
 
 static bool nlShowDone(NumberLayer *nl) {
-    return getArrayLength(nl->items) > 0;
+    return getListLength(nl->items) > 0;
 }
 
 static char *nlGetString(NumberLayerItem nli) {
@@ -135,7 +135,7 @@ NumberLayer *number_layer_create(GRect frame) {
     nl->identifier = false;
     nl->negative = false;
     nl->base = 10;
-    nl->items = makeArray(sizeof(NumberLayerItem));
+    nl->items = makeList(sizeof(NumberLayerItem));
     nl->done_cb = NULL;
     nl->cncl_cb = NULL;
     nl->current = NLZero;
@@ -144,34 +144,34 @@ NumberLayer *number_layer_create(GRect frame) {
 }
 
 void number_layer_destroy(NumberLayer *nl) {
-    destroyArray(nl->items);
+    destroyList(nl->items);
     layer_destroy(nl->l);
     free(nl);
 }
 
 double number_layer_get_number(NumberLayer *nl) {
-    array items = nl->items;
+    struct list_head *items = nl->items;
     static NumberLayerItem point = NLPoint;
-    unsigned int point_idx = getArrayItemIndex(items, &point);
+    unsigned int point_idx = getListItemIndex(items, &point);
     const char base = nl->base;
-    // const len = getArrayLength(items);
-    if (point_idx == getArrayLength(items))     // not present
+    // const len = getListLength(items);
+    if (point_idx == getListLength(items))     // not present
         point_idx = 0;
     else if (!point_idx)                        // first item
-        *(NumberLayerItem *)getArrayItemValue(items, point_idx) = NLZero;
+        *(NumberLayerItem *)getListItemValue(items, point_idx) = NLZero;
     else
-        arrayRemove(items, point_idx);
+        listRemove(items, point_idx);
     double res = 0.;
-    FOR_ARRAY_COUNTER(items, index, NumberLayerItem, item) {
+    FOR_LIST_COUNTER(items, index, NumberLayerItem, item) {
         res += (unsigned int)(*item - NLZero) * pow_di(base, index - point_idx);
     }
     return res;
 }
 
 char *number_layer_get_string(NumberLayer *nl) {
-    unsigned int len = getArrayLength(nl->items);
+    unsigned int len = getListLength(nl->items);
     char *str = malloc(len + 1);
-    FOR_ARRAY_COUNTER(nl->items, iidx, NumberLayerItem, item)
+    FOR_LIST_COUNTER(nl->items, iidx, NumberLayerItem, item)
         str[len - 1 - iidx] = nlGetString(*item)[0];
     str[len] = 0;
     return str;
@@ -180,29 +180,29 @@ char *number_layer_get_string(NumberLayer *nl) {
 void number_layer_next(NumberLayer *nl) {
     if (nl->current == NLDone)
         return number_layer_finish(nl);
-    arrayInsert(nl->items, 0, &(nl->current));
+    listInsert(nl->items, 0, &(nl->current));
     if (!nl->identifier)
         nl->current = NLDone;
     layer_mark_dirty(nl->l);
 }
 
 void number_layer_prev(NumberLayer *nl) {
-    if (!getArrayLength(nl->items)) {
+    if (!getListLength(nl->items)) {
         if (nl->cncl_cb != NULL)
             nl->cncl_cb(nl, nl->cb_ctx);
         else
             window_stack_remove(window_stack_get_top_window(), true);
         return;
     }
-    nl->current = *(NumberLayerItem *)getArrayItemValue(nl->items, 0);
-    arrayRemove(nl->items, 0);
+    nl->current = *(NumberLayerItem *)getListItemValue(nl->items, 0);
+    listRemove(nl->items, 0);
     layer_mark_dirty(nl->l);
 }
 
 void number_layer_finish(NumberLayer *nl) {
     if (nl->done_cb != NULL)
         nl->done_cb(nl, nl->cb_ctx);
-    arrayClear(nl->items);
+    listClear(nl->items);
     nl->current = nl->identifier ? NLA : NLZero;
     layer_mark_dirty(nl->l);
 }

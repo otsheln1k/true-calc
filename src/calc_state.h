@@ -2,7 +2,7 @@
 #define CALC_STATE_INCLUDED
 
 #include "eval.h"
-#include "array.h"
+#include "list.h"
 #include <math.h>
 #include "ftoa.h"
 #include <stdio.h>
@@ -52,7 +52,7 @@ typedef struct {
 } DefunMark;
 
 struct CalcState {
-    array expr;             // array of Token
+    struct list_head *expr;             // struct list_head *of Token
     TokenExp exp;           // expectations
     unsigned int nesting; 
     char *str;
@@ -61,10 +61,10 @@ struct CalcState {
     CalcStateChangedCb callback;
     CalcEvalCb eval_cb;
     bool no_cb;             // dt call cb. use when adding multiple Tokens at once
-    array fcalls;           // array of FuncallMark
+    struct list_head *fcalls;           // struct list_head *of FuncallMark
     CalcInputType cit;      // for interactive use
-    array names;            // new names. for interactive use
-    array symbols;          // array of char *. dt forget to free()
+    struct list_head *names;            // new names. for interactive use
+    struct list_head *symbols;          // struct list_head *of char *. dt forget to free()
     unsigned int argnames;  // arg names: "p%d". shows how many argnames have alr been generated
     DefunMark scope;        // inside the defun. offset can not be 0
     unsigned int history_size;
@@ -114,7 +114,7 @@ char *cs_curr_str(CalcState *cs);
 
 unsigned int cs_get_func_id(CalcState *cs);
 
-array cs_get_expr(CalcState *cs);
+struct list_head *cs_get_expr(CalcState *cs);
 
 #endif
 

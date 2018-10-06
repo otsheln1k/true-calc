@@ -1,4 +1,4 @@
-#include "array.h"
+#include "list.h"
 #include "SmallMaths.h"
 #include "eval.h"
 #include "calc_lib.h"
@@ -23,12 +23,12 @@ static void cl_lib_load() {
     add_const(180 / M_PI, "rad2deg");
 }
 
-static double predef_load(array args) {
+static double predef_load(struct list_head *args) {
     cl_lib_load();
     return 0;
 }
 
 void cl_lib_init() {
-    FUNCDEF("lib_load", makeArray(sizeof(char *)), predef_load);
+    FUNCDEF("lib_load", makeList(sizeof(char *)), predef_load);
 }
 

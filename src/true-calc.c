@@ -2,7 +2,7 @@
 #include "item_menu.h"
 #include "number_layer.h"
 #include "eval.h"
-#include "array.h"
+#include "list.h"
 #include "calc_state.h"
 #include "calc_lib.h"
 #include "ftoa.h"
@@ -82,29 +82,29 @@ void clear_const() {
     persist_write_int(0, 0);
 }
 
-static double predef_savec(array args) {
-    if (!getArrayLength(args))
+static double predef_savec(struct list_head *args) {
+    if (!getListLength(args))
         return -1.;
-    Token *tokp = GET_PTOKEN(*(array *)getArrayItemValue(args, 0), 0);
+    Token *tokp = GET_PTOKEN(*(struct list_head **)getListItemValue(args, 0), 0);
     if (tokp->type != Const)
         return -1.;
     save_const(tokp->value.id);
     return 0;
 }
 
-static double predef_loadc(array args) {
+static double predef_loadc(struct list_head *args) {
     return (double)load_const();
 }
 
-static double predef_clearc(array args) {
+static double predef_clearc(struct list_head *args) {
     clear_const();
     return 0;
 }
 
 void init_constlib() {
     FUNCDEF_ARGS("save_cst", 1, { "cst" }, predef_savec);
-    FUNCDEF("load_cst", makeArray(sizeof(char *)), predef_loadc);
-    FUNCDEF("clear_cst", makeArray(sizeof(char *)), predef_clearc);
+    FUNCDEF("load_cst", makeList(sizeof(char *)), predef_loadc);
+    FUNCDEF("clear_cst", makeList(sizeof(char *)), predef_clearc);
 }
 
 /* ---===VARIOUS-FUNCS===--- */
@@ -322,7 +322,7 @@ void mw_load(Window *wnd) {
     calc_state = cs_create();
     cs_set_cb(calc_state, cs_callback, cs_eval_cb);
 
-    init_calc();  // initializes the data arrays
+    init_calc();  // initializes the data lists
     cl_lib_init();
     init_constlib();
 

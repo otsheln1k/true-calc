@@ -2,7 +2,7 @@
 #define NUMBER_LAYER_INCLUDED
 
 #include <pebble.h>
-#include "array.h"
+#include "list.h"
 
 double pow_di(double b, int p);
 
@@ -21,7 +21,7 @@ struct NumberLayer {
     bool identifier;    // if true, show an underscore instead of the decimal point and don't allow first digits
     bool negative;      // if true, draw a minus block. ignored if identifier is true
     char base;          // number base. ignored if identifier is true
-    array items;        // reversed array of NumberLayerItem
+    struct list_head *items;        // reversed struct list_head *of NumberLayerItem
     nlCallback done_cb;
     nlCallback cncl_cb;
     NumberLayerItem current; 

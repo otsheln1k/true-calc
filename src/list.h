@@ -64,13 +64,23 @@ struct list_item *findListItem(struct list_head *arr,
                                  size_t *idx_return);
 
 
+#define LIST_ITEM_DATA(type, expr) ((type *)(expr)->data)
+#define LIST_ITEM_REF(type, expr) (*LIST_ITEM_DATA(type, expr))
+#define LIST_ITEM_SET(type, expr, new_expr)     \
+    (*LIST_ITEM_DATA(type, expr) = (new_expr))
+
+#define LIST_DATA(type, expr, idx)              \
+    LIST_ITEM_DATA(type, getListItem(expr, idx))
+#define LIST_REF(type, expr, idx)               \
+    LIST_ITEM_REF(type, getListItem(expr, idx))
+#define LIST_SET(type, expr, idx, new_expr)     \
+    LIST_ITEM_SET(type, getListItem(expr, idx), new_expr)
+
+
 // COMPATIBILITY
 
 #define FOFFSET(t, f) (((void *)&((t *)0)->f) - ((void *)0))
 
-typedef struct list_head *list;
-static inline void *getListItemValue(struct list_head *arr, unsigned int idx)
-{ return getListItem(arr, idx)->data; }
 static inline void *getListNextItem(void *item_val)
 {
     // like container_of()
@@ -82,7 +92,7 @@ static inline void setListItemValue(struct list_head *arr,
                                      unsigned int idx,
                                      void *data)
 {
-    memcpy(getListItemValue(arr, idx), data, arr->elt_size);
+    memcpy(LIST_DATA(void, arr, idx), data, arr->elt_size);
 }
 
 #define FOR_LIST_OLD(arr, idxvar, type, itemvar)           \

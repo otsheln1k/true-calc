@@ -85,7 +85,7 @@ void clear_const() {
 static double predef_savec(struct list_head *args) {
     if (!args->length)
         return -1.;
-    Token *tokp = GET_PTOKEN(*(struct list_head **)getListItemValue(args, 0), 0);
+    Token *tokp = GET_PTOKEN(LIST_REF(struct list_head *, args, 0), 0);
     if (tokp->type != Const)
         return -1.;
     save_const(tokp->value.id);

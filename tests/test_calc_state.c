@@ -132,7 +132,7 @@ bool test_cs_Stack() {
     cs_interact(cs, TIILFuncall);
     bool res = ASSERT(cs->fcalls->length == 1);
     if (!res) goto t_c_S_ret;
-    FuncallMark *fmp = getListItemValue(cs->fcalls, 0);
+    FuncallMark *fmp = LIST_DATA(FuncallMark, cs->fcalls, 0);
     res &= ASSERT(fmp->fid == fid)
         && ASSERT(fmp->nesting_level == 0)
         && ASSERT(fmp->arg_idx == 0);

@@ -21,7 +21,7 @@ bool test_eval_funcall() {
     set_func_body(fid0, convertedList((Token[3]){ { Arg, 0 }, { Operator, { .op = OAdd } }, { Number, 10 } }, 3, sizeof(Token)));
     // struct list_head *arg0 = convertedList((double[1]){ 32.0 }, 1, sizeof(double));
     struct list_head *arg0 = LIST_CONV(Token, 1, ARG({ { Number, 32.0 } }));
-    struct list_head *argv = makeList(sizeof(list));
+    struct list_head *argv = makeList(sizeof(struct list_head *));
     listAppend(argv, &arg0);
     bool res = ASSERT(call_func(fid0, argv) == 42.0);
     destroyList(arg0);
@@ -55,12 +55,12 @@ bool test_eval_assignExpr1() {
 }
 
 bool test_eval_allArgs() {
-    struct list_head *args = makeList(sizeof(list));
+    struct list_head *args = makeList(sizeof(struct list_head *));
     struct list_head *arg0 = convertedList((Token[1]){ { Number, 3. } }, 1, sizeof(Token));
     listAppend(args, &arg0);
     struct list_head *argv = eval_all_args(args);
     bool res = ASSERT(argv->length == 1)
-            && ASSERT(*(double *)getListItemValue(argv, 0) == 3);
+        && ASSERT(GET_DOUBLE(argv, 0) == 3);
     destroyList(argv);
     destroyList(arg0);
     destroyList(args);
@@ -94,7 +94,7 @@ bool test_eval_PredefinedFuncs() {
                 LIST_CONV(char *, 1, { "x" })),
             some_predef_f);
     struct list_head *arg0 = LIST_CONV(Token, 1, ARG({ { Number, 21 } }));
-    struct list_head *args = makeList(sizeof(list));
+    struct list_head *args = makeList(sizeof(struct list_head *));
     listAppend(args, &arg0);
     bool res = \
             ASSERT(call_func(fid, args) == 42.0);
@@ -108,7 +108,7 @@ bool test_eval_RedefineFunc() {
             LIST_CONV(Token, 3, ARG({
                     { Arg, { .id = 0 } }, { Operator, { .op = OMul } }, { Number, 2 } })));
     struct list_head *arg0 = LIST_CONV(Token, 1, ARG({ Number, 15 }));
-    struct list_head *args = LIST_CONV(list, 1, { arg0 });
+    struct list_head *args = LIST_CONV(struct list_head *, 1, { arg0 });
     bool res = ASSERT(call_func(fid, args) == 30);
     if (!res)
         goto t_e_rf_ret;

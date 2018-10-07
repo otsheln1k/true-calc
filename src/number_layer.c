@@ -73,9 +73,9 @@ static void nlUpdateProc(Layer *layer, GContext *ctx) {
     graphics_context_set_text_color(ctx, GColorWhite);
     // iterate through the items
     unsigned int index = 0;
-    for (NumberLayerItem *item = nl->items->length ? getListItemValue(nl->items, 0) : &minus;
-            index < (count - 1);
-            item = (index < count - 1 - neg) ? getListNextItem(item) : &minus) {
+    for (NumberLayerItem *item = nl->items->length ? nl->items->first->data : &minus;
+         index < (count - 1);
+         item = (index < count - 1 - neg) ? getListNextItem(item) : &minus) {
         // draw items here
         // if index is out of item-list's bounds, draw minus
         cur_rect.origin.x -= blck_size.w + margin;
@@ -157,7 +157,7 @@ double number_layer_get_number(NumberLayer *nl) {
     if (point_idx == items->length)     // not present
         point_idx = 0;
     else if (!point_idx)                        // first item
-        *(NumberLayerItem *)getListItemValue(items, point_idx) = NLZero;
+        LIST_SET(NumberLayerItem, items, point_idx, NLZero);
     else
         listRemove(items, point_idx);
     double res = 0.;
@@ -193,7 +193,7 @@ void number_layer_prev(NumberLayer *nl) {
             window_stack_remove(window_stack_get_top_window(), true);
         return;
     }
-    nl->current = *(NumberLayerItem *)getListItemValue(nl->items, 0);
+    nl->current = LIST_REF(NumberLayerItem, nl->items, 0);
     listRemove(nl->items, 0);
     layer_mark_dirty(nl->l);
 }

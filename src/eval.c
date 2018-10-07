@@ -90,19 +90,18 @@ unsigned int add_var(double init_val, char *name) {
 }
 
 double get_var(unsigned int varid) {  // assumes that var with id varid already exists
-    return ((NamedValue *)getListItemValue(vars, varid))->value;
+    return LIST_DATA(NamedValue, vars, varid)->value;
 }
 
 char *get_var_name(unsigned int varid) {
-    return ((NamedValue *)getListItemValue(vars, varid))->name;
+    return LIST_DATA(NamedValue, vars, varid)->name;
 }
 
 void set_var(unsigned int varid, double value) {
-    ((NamedValue *)getListItemValue(vars, varid))->value = value;
+    LIST_DATA(NamedValue, vars, varid)->value = value;
 }
 
 void remove_var(unsigned int varid) {
-    // *(NamedValue *)getListItemValue(vars, varid) = (NamedValue){ NULL, 0 };
     listRemove(vars, varid);
 }
 
@@ -120,19 +119,18 @@ unsigned int add_const(double value, char *name) {
 }
 
 double get_const(unsigned int cid) {
-    return ((NamedValue *)getListItemValue(consts, cid))->value;
+    return LIST_DATA(NamedValue, consts, cid)->value;
 }
 
 char *get_const_name(unsigned int cid) {
-    return ((NamedValue *)getListItemValue(consts, cid))->name;
+    return LIST_DATA(NamedValue, consts, cid)->name;
 }
 
 void set_const(unsigned int cid, double val) {
-    ((NamedValue *)getListItemValue(consts, cid))->value = val;
+    LIST_DATA(NamedValue, consts, cid)->value = val;
 }
 
 void remove_const(unsigned int cid) {
-    // *(NamedValue *)getListItemValue(consts, cid) = (NamedValue){ NULL, 0 };
     listRemove(consts, cid);
 }
 
@@ -143,7 +141,7 @@ unsigned int add_func(char *name) {
 }
 
 unsigned int set_func_args(unsigned int fid, struct list_head *args) {
-    DefinedFunction *func = getListItemValue(funcs, fid);
+    DefinedFunction *func = LIST_DATA(DefinedFunction, funcs, fid);
     if (func->args != NULL)
         destroyList(func->args);
     func->args = args;
@@ -151,7 +149,7 @@ unsigned int set_func_args(unsigned int fid, struct list_head *args) {
 }
 
 unsigned int set_func_body(unsigned int fid, struct list_head *body) {
-    DefinedFunction *func = getListItemValue(funcs, fid);
+    DefinedFunction *func = LIST_DATA(DefinedFunction, funcs, fid);
     if (!func->predef && func->body.tokens != NULL)
         destroyList(func->body.tokens);
     func->body.tokens = body;
@@ -160,7 +158,7 @@ unsigned int set_func_body(unsigned int fid, struct list_head *body) {
 }
 
 unsigned int set_func_func(unsigned int fid, PredefFunc f) {
-    DefinedFunction *func = getListItemValue(funcs, fid);
+    DefinedFunction *func = LIST_DATA(DefinedFunction, funcs, fid);
     if (!func->predef && func->body.tokens != NULL)
         destroyList(func->body.tokens);
     func->body.f = f;
@@ -169,27 +167,27 @@ unsigned int set_func_func(unsigned int fid, PredefFunc f) {
 }
 
 unsigned int get_func_argc(unsigned int fid) {
-    return ((DefinedFunction *)getListItemValue(funcs, fid))->args->length;
+    return LIST_DATA(DefinedFunction, funcs, fid)->args->length;
 }
 
 char *get_func_arg_name(unsigned int fid, unsigned int arg_idx) {
-    return *(char **)getListItemValue(get_func_args(fid), arg_idx);
+    return LIST_DATA(char, get_func_args(fid), arg_idx);
 }
 
 struct list_head *get_func_args(unsigned int fid) {
-    DefinedFunction *funcp = getListItemValue(funcs, fid);
+    DefinedFunction *funcp = LIST_DATA(DefinedFunction, funcs, fid);
     if (funcp->args == NULL)
         funcp->args = makeList(sizeof(char *));
     return funcp->args;
 }
 
 char *get_func_name(unsigned int fid) {
-    return ((DefinedFunction *)getListItemValue(funcs, fid))->name;
+    return LIST_DATA(DefinedFunction, funcs, fid)->name;
 }
 
 struct list_head *eval_all_args(struct list_head *args) {
     struct list_head *res = makeList(sizeof(double));
-    FOR_LIST_COUNTER(args, argn, list, argv) {
+    FOR_LIST_COUNTER(args, argn, struct list_head *, argv) {
         double val = eval_expr(*argv, 0);
         listAppend(res, &val);
     }
@@ -197,19 +195,19 @@ struct list_head *eval_all_args(struct list_head *args) {
 }
 
 double call_func(unsigned int fid, struct list_head *argv) {
-    DefinedFunction *func = getListItemValue(funcs, fid);
+    DefinedFunction *func = LIST_DATA(DefinedFunction, funcs, fid);
     if (func->predef)
         return func->body.f(argv);
     struct list_head *argval = eval_all_args(argv);
     struct list_head *body = listCopy(func->body.tokens);
     unsigned int len = body->length;
     unsigned int idx = 0;
-    for (Token *itmp = (Token *)getListItemValue(body, 0);
+    for (Token *itmp = LIST_DATA(Token, body, 0);
             idx < len;
             itmp = (Token *)getListNextItem(itmp)) {
         if (itmp->type == Arg) {
             itmp->type = Number;
-            itmp->value.number = *(double *)getListItemValue(argval, itmp->value.id);
+            itmp->value.number = LIST_REF(double, argval, itmp->value.id);
         }
         idx += 1;
     }
@@ -220,7 +218,7 @@ double call_func(unsigned int fid, struct list_head *argv) {
 }
 
 void remove_func(unsigned int fid) {
-    DefinedFunction *func = getListItemValue(funcs, fid);
+    DefinedFunction *func = LIST_DATA(DefinedFunction, funcs, fid);
     if (func->args != NULL)
         destroyList(func->args);
     if (!func->predef && func->body.tokens != NULL)
@@ -229,7 +227,7 @@ void remove_func(unsigned int fid) {
 }
 
 bool is_predefined_func(unsigned int fid) {
-    return ((DefinedFunction *)getListItemValue(funcs, fid))->predef;
+    return LIST_DATA(DefinedFunction, funcs, fid)->predef;
 }
 
 double eval_angle(double angle) {
@@ -313,7 +311,9 @@ double eval_expr(struct list_head *tokens, int operator_order) {
     unsigned int oindex = 0;
     bool par_ok = false;
     unsigned int indx = 0;
-    for (Token *iter = getListItemValue(tokens, 0); indx < tlen; iter = (Token *)getListNextItem(iter)) {
+    for (Token *iter = LIST_DATA(Token, tokens, 0);
+         indx < tlen;
+         iter = (Token *)getListNextItem(iter)) {
         if (iter->type == Operator) {
             switch (iter->value.op) {
                 case OAssign:
@@ -370,7 +370,7 @@ double eval_expr(struct list_head *tokens, int operator_order) {
         destroyListHeader(xpr);
         return res;
     } else if (otoken->type == Operator && otoken->value.op == OLCall) {
-        struct list_head *args = makeList(sizeof(list));
+        struct list_head *args = makeList(sizeof(struct list_head *));
         unsigned int nesting = 0;
         unsigned int sindex = oindex;
         unsigned int iindex = oindex + 1;
@@ -404,7 +404,7 @@ double eval_expr(struct list_head *tokens, int operator_order) {
                 }
 eval_f:;
        double res = eval_funcall(GET_TOKEN(tokens, oindex - 1).value.id, args);
-       FOR_LIST_COUNTER(args, argn, list, arg)
+       FOR_LIST_COUNTER(args, argn, struct list_head *, arg)
            destroyListHeader(*arg);
        destroyList(args);
        return res;

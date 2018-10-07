@@ -87,7 +87,7 @@ char *cs_get_token_text(CalcState *cs, Token token) {
                 unsigned int len = cs->fcalls->length;
                 return get_func_arg_name(
                         (len
-                         ? ((FuncallMark *)getListItemValue(cs->fcalls, 0))->fid
+                         ? ((FuncallMark *)cs->fcalls->first->data)->fid
                          : cs->scope.fid),
                         token.value.id);
             }
@@ -230,7 +230,7 @@ void cs_modify_expect(CalcState *cs, Token *new_tok_p) {
         (new_tok_p->value.op == ORp || new_tok_p->value.op == ORCall)))
      && new_tok_p->type != UOperator
      && cs->fcalls->length
-     && cs->nesting - 1 == (fmp = ((FuncallMark *)getListItemValue(cs->fcalls, 0)))->nesting_level
+     && cs->nesting - 1 == (fmp = ((FuncallMark *)cs->fcalls->first->data))->nesting_level
      && cs->exp & TEBinaryOperator) {
         MOD_FLAGS(cs->exp, TEFRCall | TEFComma, TENone);
     } else if (
@@ -238,7 +238,7 @@ void cs_modify_expect(CalcState *cs, Token *new_tok_p) {
      && new_tok_p->type != UOperator
      && cs->nesting
      && (!cs->fcalls->length
-       || cs->nesting - 1 != ((FuncallMark *)getListItemValue(cs->fcalls, 0))->nesting_level)) {
+       || cs->nesting - 1 != ((FuncallMark *)cs->fcalls->first->data)->nesting_level)) {
         MOD_FLAGS(cs->exp, TECloseParen, TENone);
     }
     if (cs->scope.offset && cs->exp & TEValue)
@@ -298,7 +298,7 @@ void cs_add_item(CalcState *cs, Token new_tok) {
             case OComma:
                 if (cs->scope.nesting_level >= cs->nesting)
                     cs->scope.offset = 0;
-                ((FuncallMark *)getListItemValue(cs->fcalls, 0))->arg_idx += 1;
+                ((FuncallMark *)cs->fcalls->first->data)->arg_idx += 1;
                 break;
             case ORCall:
                 if (cs->scope.nesting_level >= cs->nesting)
@@ -354,7 +354,7 @@ void cs_rem_item(CalcState *cs) {
                 cs->nesting -= 1;
                 break;
             case OComma:
-                ((FuncallMark *)getListItemValue(cs->fcalls, 0))->arg_idx -= 1;
+                ((FuncallMark *)cs->fcalls->first->data)->arg_idx -= 1;
                 break;
             case ORCall:
                 {
@@ -380,7 +380,7 @@ void cs_rem_item(CalcState *cs) {
         }
     else if (t->type != Number && t->type != UOperator
             && cs->names->length
-            && (((NewNameMark *)getListItemValue(cs->names, 0))->offset == len))
+            && (((NewNameMark *)cs->names->first)->offset == len))
         // automaticaly remove the unneeded symbols here
         cs_remove_unneeded(cs);
     size_t newbs = cs->block_size;
@@ -499,12 +499,12 @@ static char **cs_get_argname(CalcState *cs, unsigned int idx) {
         snprintf(buf, sn, "p%d", cs->argnames + 1);
         listInsert(cs->symbols, cs->argnames, &buf);
     }
-    return getListItemValue(cs->symbols, idx);
+    return LIST_DATA(char *, cs->symbols, idx);
 }
 
 void cs_input_newarg(CalcState *cs) {
     if (cs->cit == ITArg) {
-        FuncallMark *fm = getListItemValue(cs->fcalls, 0);
+        FuncallMark *fm = LIST_DATA(FuncallMark, cs->fcalls, 0);
         listAppend(get_func_args(fm->fid),
             cs_get_argname(cs, fm->arg_idx));
         cs_input_id(cs, fm->arg_idx);
@@ -521,7 +521,7 @@ void cs_remove_symbol(CalcState *cs, char *sym) {
 }
 
 void cs_remove_unneeded(CalcState *cs) {
-    NewNameMark nnm = *(NewNameMark *)getListItemValue(cs->names, 0);
+    NewNameMark nnm = LIST_REF(NewNameMark, cs->names, 0);
     listRemove(cs->names, 0);
     switch (nnm.type) {
         case ITVar:

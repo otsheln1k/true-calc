@@ -68,11 +68,11 @@ typedef struct {
 #define M_PI 3.14159265358979323846
 #endif
 
-#define GET_TOKEN(arr,idx) (*(Token *)getListItemValue(arr, idx))
+#define GET_TOKEN(arr,idx) LIST_REF(Token, arr, idx)
 
-#define GET_PTOKEN(arr,idx) ((Token *)getListItemValue(arr, idx))
+#define GET_PTOKEN(arr,idx) LIST_DATA(Token, arr, idx)
 
-#define GET_DOUBLE(arr, idx) (*(double *)getListItemValue(arr, idx))
+#define GET_DOUBLE(arr, idx) LIST_REF(double, arr, idx)
 
 #define PREDEF_ONELINE_FUNC(name, args_name, argv_name, expr) \
     static double name(struct list_head *args_name) { \
@@ -125,9 +125,9 @@ void remove_const(unsigned int);
 
 unsigned int add_func(char *);
 
-unsigned int set_func_args(unsigned int, list);  // args: struct list_head *of char*
+unsigned int set_func_args(unsigned int, struct list_head *);  // args: struct list_head *of char*
 
-unsigned int set_func_body(unsigned int, list);  // body: struct list_head *of Token
+unsigned int set_func_body(unsigned int, struct list_head *);  // body: struct list_head *of Token
 
 unsigned int set_func_func(unsigned int fid, PredefFunc f);
 
@@ -139,9 +139,9 @@ char *get_func_arg_name(unsigned int, unsigned int);
 
 char *get_func_name(unsigned int);
 
-struct list_head *eval_all_args(list);
+struct list_head *eval_all_args(struct list_head *);
 
-double call_func(unsigned int, list);  // args: struct list_head *of struct list_head *of Token
+double call_func(unsigned int, struct list_head *);  // args: struct list_head *of struct list_head *of Token
 
 void remove_func(unsigned int);
 
@@ -153,13 +153,13 @@ double eval_operation(OperatorType, double, double);
 
 double eval_uoperation(UOperatorType, double);
 
-LValue eval_lvalue(list);
+LValue eval_lvalue(struct list_head *);
 
-LValue eval_assign(LValue, list);  // rvalue: struct list_head *of Token
+LValue eval_assign(LValue, struct list_head *);  // rvalue: struct list_head *of Token
 
-double eval_funcall(unsigned int, list);  // args: struct list_head *of struct list_head *of Token
+double eval_funcall(unsigned int, struct list_head *);  // args: struct list_head *of struct list_head *of Token
 
-double eval_expr(list, int);
+double eval_expr(struct list_head *, int);
 
 /*----------------END----------------*/
 

@@ -3,7 +3,7 @@
 #include <list.h>
 #include <test_ut.h>
 
-#define GET_INT(arr,idx) *(int *)getListItemValue(arr, idx)
+#define GET_INT(arr,idx) LIST_REF(int, arr, idx)
 
 void listAppendInt(struct list_head *arr, int i) {
     listAppend(arr, &i);
@@ -75,14 +75,14 @@ typedef struct {
 
 bool test_array_ConvEx() {
     struct list_head *stringarr = convertedList((char*[3]){ "abc", "def", "ghi" }, 3, sizeof(char *));
-    if (!ASSERT(strcmp(*(char **)getListItemValue(stringarr, 1), "def") == 0)) {
-        printf("%s\n", *(char **)getListItemValue(stringarr, 1));
+    if (!ASSERT(strcmp(LIST_REF(char *, stringarr, 1), "def") == 0)) {
+        printf("%s\n", LIST_REF(char *, stringarr, 1));
         bool res = false;
         goto t_a_CE_ret_1;
     }
     struct list_head *structarr = convertedList((SType[4]){ { 1, 1.2 }, { 2, 2.2 }, { 3, 3.2 }, { 4, 4.2 } }, 4, sizeof(SType));
-    if (!(ASSERT(((SType *)getListItemValue(structarr, 2))->f == 3.2)
-        &&ASSERT((*(SType *)getListItemValue(structarr, 1)).i == 2))) {
+    if (!(ASSERT(LIST_DATA(SType, structarr, 2)->f == 3.2)
+          && ASSERT(LIST_DATA(SType, structarr, 1)->i == 2))) {
         bool res = false;
         goto t_a_CE_ret_2;
     }
@@ -96,10 +96,10 @@ t_a_CE_ret_1:
     return res;
 }
 
-#define GET_LIST(arr,idx) *(struct list_head **)getListItemValue(arr, idx)
+#define GET_LIST(arr,idx) LIST_REF(struct list_head *, arr, idx)
 
 bool test_array_2dim() {
-    struct list_head *arr = makeList(sizeof(list));
+    struct list_head *arr = makeList(sizeof(struct list_head *));
     struct list_head *a01 = convertedList((int[6]){0, 1, 2, 3, 4, 5}, 6, sizeof(int));
     listAppend(arr, &a01);
     struct list_head *a02 = convertedList((int[6]){7, 8, 9, 10, 11, 12}, 6, sizeof(int));
@@ -116,7 +116,7 @@ bool test_array_2dim() {
 
 bool test_array_NextItem() {
     struct list_head *arr = convertedList((int[6]){0, 1, 2, 3, 4, 5}, 6, sizeof(int));
-    int *item2 = getListItemValue(arr, 2);
+    int *item2 = LIST_DATA(int, arr, 2);
     int *item3 = getListNextItem(item2);
     bool res = \
            ASSERT(*item2 == 2)
@@ -191,7 +191,7 @@ bool test_array_Search() {
     int b = 6;
     bool res = ASSERT(getListItemIndex(arr, &a) == 4)
             && ASSERT(getListItemIndex(arr, &b) == 6)
-            && ASSERT(getListItemByVal(arr, &a) == getListItemValue(arr, 4))
+            && ASSERT(getListItemByVal(arr, &a) == LIST_DATA(int, arr, 4))
             && ASSERT(getListItemByVal(arr, &b) == NULL);
     destroyList(arr);
     return res;

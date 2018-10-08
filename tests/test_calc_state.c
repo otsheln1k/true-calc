@@ -59,10 +59,19 @@ char *t_ftoa(double d) {
 }
 
 bool test_cs_ftoa() {
+    char small_buf[9];
     return ASSERT(!strcmp(t_ftoa(42), "42"))
         && ASSERT(!strcmp(t_ftoa(.05), ".05"))
         && ASSERT(!strcmp(t_ftoa(12.34), "12.34"))
-        && ASSERT(!strcmp(t_ftoa(11.), "11"));
+        && ASSERT(!strcmp(t_ftoa(11.), "11"))
+        && ASSERT(!strcmp(t_ftoa(-100500.25), "-100500.25"))
+        && ASSERT(!strcmp(t_ftoa(1e21), "1e21"))
+        && (ftoa(-123.5679, small_buf, 9),
+            ASSERT(!strcmp(small_buf, "-123.568")))
+        && (ftoa(-0.0000123, small_buf, 9),
+            ASSERT(!strcmp(small_buf, "-1.23e-5")))
+        && (ftoa(12345678, small_buf, 9),
+            ASSERT(!strcmp(small_buf, "1.2346e7")));
 }
 
 bool test_cs_Interact() {

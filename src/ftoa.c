@@ -1,9 +1,8 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include "ieee_fp.h"
 #include "ftoa.h"
-
-#define EPS 0.00000001
 
 #define MAX_EXPT 7
 #define MIN_DIGITS 3
@@ -24,7 +23,7 @@ static int get_digit(double *d_rw, double p10,
     d -= head * p10;
     next = d / p10;
     
-    if (next > 1 - EPS) {
+    if (FP_EQ(next, 1.0)) {
         head += 1.0;
         next = 0.0;
         d -= p10;
@@ -45,7 +44,7 @@ void ftoa(double d, char *buf, size_t num)
     int expt = 0;
     double p10 = 1.0;
     
-    int is_negative = (d < -EPS);
+    int is_negative = FP_LT(d, 0.0);
     int is_expt_0;
     int is_expt_g10;
     int is_expt_neg;
@@ -59,7 +58,7 @@ void ftoa(double d, char *buf, size_t num)
 
     if (num < 2) return;
 
-    if (fabs(d) < EPS) {
+    if (FP_EQ(d, 0.0)) {
         buf[0] = '0';
         buf[1] = 0;
         return;
@@ -135,7 +134,7 @@ void ftoa(double d, char *buf, size_t num)
             *(pos++) =
                 DIGIT_CHAR(get_digit(&d, p10, (--chars == expt_width)));
             p10 /= 10.0;
-        } while (chars > expt_width + (idx == 1) && fabs(d) >= EPS);
+        } while (chars > expt_width + (idx == 1) && !FP_EQ(d, 0.0));
         *(pos++) = EXPT_CHAR;
         if (is_expt_neg) {
             *(pos++) = '-';
@@ -167,14 +166,14 @@ void ftoa(double d, char *buf, size_t num)
         // fractional part may be zero
         // also, don’t write zeroes unless we can add at least one
         // meaningful digit
-        if (ABS_V(d) >= EPS && chars > 1 + zero_count) {
+        if (!FP_EQ(d, 0.0) && chars > 1 + zero_count) {
             // reduce remaining space beforehand
             chars -= 1 + zero_count;
             // decimal point is required (it)
             *(pos++) = '.';
             // if the number had negative exponent at the beginning
             while (zero_count--) *(pos++) = '0';
-            while (chars && fabs(d) >= EPS) {
+            while (chars && !FP_EQ(d, 0.0)) {
                 *(pos++) = DIGIT_CHAR(get_digit(&d, p10, !--chars));
                 p10 /= 10.0;
             }

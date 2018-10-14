@@ -1,9 +1,9 @@
 #include "test_ut.h"
+#include "ieee_fp.h"
 #include "eval.h"
 
 // TODO check eval.c
 // TODO predefined symbols
-// TODO eval_angle
 
 typedef unsigned int uint;
 
@@ -19,7 +19,6 @@ bool test_eval_funcall() {
     unsigned int fid0 = add_func("f");
     set_func_args(fid0, convertedList((char*[1]){ "a" }, 1, sizeof(char *)));
     set_func_body(fid0, convertedList((Token[3]){ { Arg, 0 }, { Operator, { .op = OAdd } }, { Number, 10 } }, 3, sizeof(Token)));
-    // struct list_head *arg0 = convertedList((double[1]){ 32.0 }, 1, sizeof(double));
     struct list_head *arg0 = LIST_CONV(Token, 1, ARG({ { Number, 32.0 } }));
     struct list_head *argv = makeList(sizeof(struct list_head *));
     listAppend(argv, &arg0);
@@ -30,6 +29,7 @@ bool test_eval_funcall() {
 }
 
 bool test_eval_expr1() {
+    // ( 15. - 3. ) * 4.
     struct list_head *tokens = convertedList((Token[7]){
             { Operator, { .op = OLp } },
             { Number, 15. }, { Operator, { .op = OSub } }, { Number, 3. },
@@ -125,17 +125,30 @@ t_e_rf_ret:
     return res;
 }
 
+bool test_eval_ieeeFp() {
+    return ASSERT(ieee_copysign(1.0, -1.0) == -1.0)
+        && ASSERT(ieee_copysign(-100.5, 0.3) == 100.5)
+        && ASSERT(ieee_copysign(0.0, -1.0) == -0.0)
+        && ASSERT(ieee_trunc(23.5) == 23.0)
+        && ASSERT(ieee_trunc(-12.1245) == -12.0)
+        && ASSERT(ieee_fabs(0.5) == 0.5)
+        && ASSERT(ieee_fabs(-12365312) == 12365312)
+        && ASSERT(FP_EQ(ieee_fmod(11.5, 3.2), 1.9))
+        && ASSERT(FP_EQ(ieee_fmod(0.03, 0.01), 0.0));
+}
+
 int main() {
     init_calc();
     bool res =
         test_eval_vars()
-     && test_eval_funcall()
-     && test_eval_expr1()
-     && test_eval_assignExpr1()
-     && test_eval_allArgs()
-     && test_eval_assignExpr2()
-     && test_eval_PredefinedFuncs()
-     && test_eval_RedefineFunc();
+        && test_eval_funcall()
+        && test_eval_expr1()
+        && test_eval_assignExpr1()
+        && test_eval_allArgs()
+        && test_eval_assignExpr2()
+        && test_eval_PredefinedFuncs()
+        && test_eval_RedefineFunc()
+        && test_eval_ieeeFp();
     if (res)
         fprintf(stderr, "All ok\n");
     destroy_calc();

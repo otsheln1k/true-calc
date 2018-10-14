@@ -35,7 +35,7 @@ static CalcInputType _tii_to_cit(TokenItemId tii) {
     return tii - TIINumber + ITNumber;
 }
 
-static TokenType _cit_to_tt(CalcInputType cit) {
+static enum token_type _cit_to_tt(CalcInputType cit) {
     switch (cit) {
         case ITNumber:
             return Number;
@@ -324,7 +324,7 @@ void cs_add_item(CalcState *cs, Token new_tok) {
             default:
                 break;
         }
-    listAppendToken(cs->expr, new_tok);
+    listAppend(cs->expr, &new_tok);
     cs_modify_expect(cs, &new_tok);
     char *s = cs_get_token_text(cs, new_tok);
     size_t slen = strlen(s);

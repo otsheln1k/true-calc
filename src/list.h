@@ -21,27 +21,32 @@ typedef int (*listIterFunc)(struct list_head *arr,
                              void *user_data);
 
 
-#define FOR_LIST_ITEMS(arr, index_var, item_var)     \
-    for (item_var = arr->first, index_var = 0;  \
-         (++index_var) < arr->length;           \
-         item_var = item_var->next)
+#define FOR_LIST_ITEMS(arr, index_var, item_var)    \
+    for (item_var = arr->first, index_var = 0;      \
+         index_var < arr->length;                   \
+         item_var = item_var->next, index_var++)
 
-#define LIST_TAIL(arr, stt)                    \
+#define LIST_TAIL(arr, stt)                     \
     listSlice((arr), (stt), (arr)->length)
 
-#define LIST_CONV(type, count, items)              \
+#define LIST_CONV(type, count, items)                           \
     convertedList(((type[count])items), (count), sizeof(type))
 
 struct list_head *makeList(size_t elt_size);
+struct list_item *makeListItem(size_t elt_size);
+struct list_head *takeListItems(struct list_item *first,
+                                size_t len,
+                                size_t elt_size);
 struct list_head *convertedList(void *carray,
-                                  size_t len,
-                                  size_t elt_size);
+                                size_t len,
+                                size_t elt_size);
 void *listJoint(struct list_head * arr);
 struct list_item *destroyList(struct list_head *arr);
 void destroyListHeader(struct list_head *slc);
+void listAlias(struct list_head *dest, struct list_head *src);
 struct list_head *listSlice(struct list_head *arr,
-                               size_t stt,
-                              size_t end);
+                            size_t stt,
+                            size_t end);
 struct list_item *listDetach(struct list_head *arr);
 struct list_head *listCopy(struct list_head *original);
 struct list_item *listPart(struct list_head *arr,
@@ -51,9 +56,10 @@ struct list_item *listReverse(struct list_head *arr);
 struct list_item *listReverseSaveLink(struct list_head *arr);
 struct list_item *listClear(struct list_head *arr);
 struct list_item *getListItem(struct list_head *arr, size_t index);
-struct list_item * listAppend(struct list_head * arr, void *elt);
-struct list_item * listInsert(struct list_head *arr, size_t index, void *elt);
-struct list_item * listPush(struct list_head *arr, void *elt);
+struct list_item *listAppend(struct list_head * arr, void *elt);
+struct list_item *listInsert(struct list_head *arr, size_t index, void *elt);
+struct list_item *listPush(struct list_head *arr, void *elt);
+struct list_item *listPop(struct list_head *arr, size_t index);
 void listRemove(struct list_head *arr, size_t index);
 void listIter(struct list_head *arr,
                listIterFunc f,
@@ -116,7 +122,7 @@ static inline void setListItemValue(struct list_head *arr,
 
 #endif
 
-#define FOR_LIST_COUNTER(arr, idxvar, type, itemvar)   \
+#define FOR_LIST_COUNTER(arr, idxvar, type, itemvar)    \
     unsigned int idxvar = 0;                            \
     FOR_LIST_OLD(arr, idxvar, type, itemvar)
 

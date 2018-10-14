@@ -1,10 +1,10 @@
 #include <stdbool.h>
+#include <math.h>
 
 #ifdef __PEBBLE__
 #include "SmallMaths.h"
 #define __pow sm_pow
 #else
-#include <math.h>
 #define __pow pow
 #endif
 
@@ -47,7 +47,7 @@ void destroy_eval_state(struct eval_state *e)
 
     destroyList(e->vars);
     destroyList(e->consts);
-    
+
     FOR_LIST(e->funcs, idx, item) {
         func = LIST_ITEM_DATA(struct function, item);
         if (func->args)
@@ -155,7 +155,7 @@ struct list_head *eval_arglist_es(struct eval_state *e,
     struct token *t;
     int nesting = 0;
     const struct operator_props *props;
-    
+
     FOR_LIST(tokens, idx, iter) {
         t = LIST_ITEM_DATA(struct token, iter);
         props = token_props(t);
@@ -200,14 +200,14 @@ double call_func_es(struct eval_state *e,
                 LIST_REF(double, argval, token->value.id);
         }
     }
-    
+
     double res = eval_expr_es(e, body);
     destroyList(body);
     destroyList(argval);
     return res;
 }
 
-double eval_operation(enum operator_type operation,
+double eval_arithmetic(enum operator_type operation,
                       double op1, double op2)
 {
     switch (operation) {
@@ -242,7 +242,7 @@ double eval_uoperation(enum uoperator_type uoperation, double op)
     }
 }
 
-void eval_lvalue_es(struct list_head *tokens, struct lvalue *ret_lvalue)
+bool eval_lvalue_es(struct list_head *tokens, struct lvalue *ret_lvalue)
 {
     bool is_func = false;
 
@@ -253,12 +253,13 @@ void eval_lvalue_es(struct list_head *tokens, struct lvalue *ret_lvalue)
         if (t1->type == Operator && t1->value.op == OLCall
             && t2->type == Operator && t2->value.op == ORCall)
             is_func = true;
-        // else it actually is an error, but we won’t handle
-        // errors here
+        else
+            return false;
     }
 
     ret_lvalue->id = GET_TOKEN(tokens, 0).value.id;
     ret_lvalue->is_func = is_func;
+    return true;
 }
 
 const struct operator_props *token_props(struct token *tok)
@@ -303,29 +304,19 @@ double eval_assignment_es(struct eval_state *e,
     return val;
 }
 
-double eval_expr_es(struct eval_state *e,
-                    struct list_head *tokens)
+struct list_item *find_next_token(struct list_head *tokens,
+                                  size_t *out_idx)
 {
     size_t idx;
     struct list_item *item;
     struct token *t;
     const struct operator_props *props;
     int nesting = 0;
-    
+
     struct list_item *min_item;
-    struct token *min_token;
     size_t min_idx;
     int min_order = -1;
 
-    struct lvalue lvalue;
-
-    // if there is only 1 token, then it’s an atom
-    if (tokens->length == 1)
-        return eval_atom_es(e, LIST_ITEM_DATA(struct token,
-                                              tokens->first));
-
-    // find the topmost operator: zero nesting,
-    // lowest precedence (order)
     FOR_LIST(tokens, idx, item) {
         t = LIST_ITEM_DATA(struct token, item);
         props = token_props(t);
@@ -339,8 +330,63 @@ double eval_expr_es(struct eval_state *e,
         nesting += props->nesting;
     }
 
+    if (min_order < 0)
+        return NULL;
+
+    if (out_idx)
+        *out_idx = min_idx;
+    return min_item;
+}
+
+double eval_binary_es(struct eval_state *e,
+                      enum operator_type op,
+                      struct list_head *left,
+                      struct list_head *right)
+{
+    struct list_head *split_args;
+    double val;
+    struct lvalue lvalue;
+    bool ret;
+
+    switch (op) {
+    case OLCall:
+        split_args = eval_arglist_es(e, right);
+        val = call_func_es(e,
+                           LIST_ITEM_DATA(
+                               struct token,
+                               left->first)->value.id,
+                           split_args);
+        destroyListHeader(split_args);
+        return val;
+    case OAssign:
+        ret = eval_lvalue_es(left, &lvalue);
+        // if ret is zero, it’s an error
+        return ret ? eval_assignment_es(e, &lvalue, right) : NAN;
+    default:
+        return eval_arithmetic(op,
+                               eval_expr_es(e, left),
+                               eval_expr_es(e, right));
+    }
+}
+
+double eval_expr_es(struct eval_state *e,
+                    struct list_head *tokens)
+{
+    struct token *min_token;
+    struct list_item *min_item;
+    size_t min_idx;
+
+    // if there is only 1 token, then it’s an atom
+    if (tokens->length == 1)
+        return eval_atom_es(e, LIST_ITEM_DATA(struct token,
+                                              tokens->first));
+
+    // find the topmost operator: zero nesting,
+    // lowest precedence (order)
+    min_item = find_next_token(tokens, &min_idx);
+
     // no top-level operator
-    if (min_order < 0) {
+    if (min_item == NULL) {
         struct list_head *new_list =
             listSlice(tokens, 1, tokens->length - 1);
         double val = eval_expr_es(e, new_list);
@@ -354,9 +400,9 @@ double eval_expr_es(struct eval_state *e,
     if (min_token->type == UOperator) {
         struct list_head *op_expr = listSlice(tokens, min_idx + 1,
                                          tokens->length);
-        double op = eval_expr_es(e, op_expr);
+        double operand = eval_expr_es(e, op_expr);
         destroyListHeader(op_expr);
-        return eval_uoperation(min_token->value.uop, op);
+        return eval_uoperation(min_token->value.uop, operand);
     }
 
     // binary operators
@@ -366,34 +412,16 @@ double eval_expr_es(struct eval_state *e,
             takeListItems(min_item->next,
                           tokens->length - min_idx - 1,
                           tokens->elt_size);
-        struct list_head *split_args;
-        double val;
-        switch (min_token->value.op) {
-        case OLCall:
-            split_args = eval_arglist_es(e, right);
-            val = call_func_es(e,
-                               LIST_ITEM_DATA(
-                                   struct token,
-                                   left->first)->value.id,
-                               split_args);
-            destroyListHeader(split_args);
-            break;
-        case OAssign:
-            eval_lvalue_es(left, &lvalue);
-            val = eval_assignment_es(e, &lvalue, right);
-            break;
-        default:
-            val = eval_operation(min_token->value.op,
-                                 eval_expr_es(e, left),
-                                 eval_expr_es(e, right));
-        }
+
+        double val = eval_binary_es(e, min_token->value.op, left, right);
+
         destroyListHeader(left);
         destroyListHeader(right);
         return val;
     }
 
-    // this should be an error
-    return -1.0;
+    // instead of error
+    return NAN;
 }
 
 
@@ -462,7 +490,7 @@ unsigned int add_const(double val, char *name)
 { return add_value(default_eval_state.consts, val, name); }
 
 double get_const(unsigned int cid)
-{ return get_value(default_eval_state.consts, cid); }    
+{ return get_value(default_eval_state.consts, cid); }
 
 char *get_const_name(unsigned int cid)
 { return get_value_name(default_eval_state.consts, cid); }
@@ -558,6 +586,7 @@ void remove_func(unsigned int fid)
 struct lvalue eval_lvalue(struct list_head *tokens)
 {
     struct lvalue x;
+    // ignore errors
     eval_lvalue_es(tokens, &x);
     return x;
 }

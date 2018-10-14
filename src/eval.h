@@ -96,16 +96,22 @@ struct list_head *eval_arglist_es(struct eval_state *e,
 double call_func_es(struct eval_state *e,
                     unsigned int fid,
                     struct list_head *argv);
-double eval_operation(enum operator_type operation,
+double eval_arithmetic(enum operator_type operation,
                       double op1, double op2);
 double eval_uoperation(enum uoperator_type uoperation,
                        double op);
-void eval_lvalue_es(struct list_head *tokens,
+bool eval_lvalue_es(struct list_head *tokens,
                     struct lvalue *ret_lvalue);
 const struct operator_props *token_props(struct token *tok);
 double eval_assignment_es(struct eval_state *e,
                           struct lvalue *lvalue,
                           struct list_head *rvalue);
+struct list_item *find_next_token(struct list_head *tokens,
+                                  size_t *out_idx);
+double eval_binary_es(struct eval_state *e,
+                      enum operator_type op,
+                      struct list_head *left,
+                      struct list_head *right);
 double eval_expr_es(struct eval_state *e,
                     struct list_head *tokens);
 

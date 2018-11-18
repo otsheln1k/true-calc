@@ -66,6 +66,7 @@ struct calc_state {
     // string buffer size
     // TODO: remove
     size_t str_sz;
+    // including null byte
     size_t str_len;
     calc_state_changed_cb callback;
     calc_eval_cb eval_cb;

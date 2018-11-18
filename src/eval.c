@@ -313,7 +313,7 @@ struct list_item *find_next_token(struct list_head *tokens,
     const struct operator_props *props;
     int nesting = 0;
 
-    struct list_item *min_item;
+    struct list_item *min_item = NULL;
     size_t min_idx;
     int min_order = -1;
 

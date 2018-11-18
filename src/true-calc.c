@@ -121,7 +121,7 @@ static enum token_item_id getTokenItemId(unsigned int tm_selection) {
     }
 }
 
-static char *getOperatorName(unsigned int idx) {
+static const char *getOperatorName(unsigned int idx) {
     return getButtonText(getTokenItemId(idx));  // getButtonText from cs
 }
 
@@ -175,7 +175,7 @@ unsigned int tm_count_cb(ItemMenuLayer *tm, void *ctx) {
          + cs_show_item(calc_state, TIIReturn) * 3;
 }
 
-char *tm_title_cb(ItemMenuLayer *tm, unsigned int idx, void *ctx) {
+const char *tm_title_cb(ItemMenuLayer *tm, unsigned int idx, void *ctx) {
     return getOperatorName(idx);
 }
 
@@ -270,7 +270,7 @@ uint16_t ml_get_num_rows(MenuLayer *ml, uint16_t idx, void *ctx) {
     case ITFunc:
         return count_func() + 1;
     case ITArg:
-        get_func_argc(cs_get_func_id(calc_state));
+        return get_func_argc(cs_get_func_id(calc_state));
     default:
         /* never reached */
         return 0;

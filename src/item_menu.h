@@ -8,7 +8,7 @@ typedef struct ItemMenuLayer ItemMenuLayer;
 
 typedef unsigned int (*imItemCountCallback)(ItemMenuLayer *im, void *cb_context);
 
-typedef char *(*imItemTitleCallback)(ItemMenuLayer *im, unsigned int index, void *cb_context);
+typedef const char *(*imItemTitleCallback)(ItemMenuLayer *im, unsigned int index, void *cb_context);
 
 typedef void (*imItemCallback)(ItemMenuLayer *im, unsigned int index, void *cb_context);
 

@@ -68,16 +68,16 @@ static void imUpdateProc(Layer *layer, GContext *ctx) {
     graphics_context_set_stroke_color(ctx, GColorBlack);
     graphics_context_set_text_color(ctx, GColorWhite);
     for (unsigned int index = 0; index < count; index++) {
-        char *str = ITEM_MENU_CB_DATA(layer)->titleCb(
+        const char *str = ITEM_MENU_CB_DATA(layer)->titleCb(
                 ITEM_MENU_CB_DATA(layer)->iml,
                 index,
                 ITEM_MENU_CB_DATA(layer)->iml->cb_ctx);
         GSize bounds = graphics_text_layout_get_content_size(
-                str,
-                font,
-                GRect(0, 0, layer_size.w, layer_size.h),
-                GTextOverflowModeWordWrap,
-                GTextAlignmentLeft);
+            str,
+            font,
+            GRect(0, 0, layer_size.w, layer_size.h),
+            GTextOverflowModeWordWrap,
+            GTextAlignmentLeft);
         if (!h)
             h = bounds.h;
 start_draw_item:;
@@ -116,13 +116,13 @@ start_draw_item:;
         }
         graphics_fill_rect(ctx, rect_wide, 0, GCornerNone);
         graphics_draw_text(
-                ctx,
-                str,
-                font,
-                rect,
-                GTextOverflowModeWordWrap,
-                GTextAlignmentCenter,
-                NULL);
+            ctx,
+            str,
+            font,
+            rect,
+            GTextOverflowModeWordWrap,
+            GTextAlignmentCenter,
+            NULL);
         if (index == sel_idx) {
             graphics_draw_rect(ctx, rect_wide);
             graphics_context_set_text_color(ctx, GColorWhite);

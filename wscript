@@ -60,7 +60,7 @@ def build(ctx):
         ctx.env = ctx.all_envs[platform]
         ctx.set_group(ctx.env.PLATFORM_NAME)
         app_elf = '{}/pebble-app.elf'.format(ctx.env.BUILD_DIR)
-        ctx.env.CFLAGS.extend(['-D', '__PEBBLE__', "-Wimplicit-fallthrough=1"])
+        ctx.env.CFLAGS.extend(['-D', '__PEBBLE__', "-fno-strict-aliasing"])
         ctx.pbl_build(
             source=ctx.path.ant_glob(
                 os.path.join(srcdir, '**/*.c'),

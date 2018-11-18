@@ -25,7 +25,7 @@
 
 /*
  * Calling an undefined (not-yet-defined) function
- * should be undefined/forgiven
+ * should be undefined/forbidden
  */
 
 /*
@@ -87,14 +87,22 @@ static char *make_prefixed_number_string(const char *prefix,
                                          unsigned int number)
 {
     size_t len = strlen(prefix) + digit_count(number) + 1;
-    char *str = malloc(len * sizeof(*str));
-    sprintf(str, "%s%u", prefix, number);
+    char *str = malloc(sizeof(char) * len);
+    char *c = &str[len - 2];
+
+    strcpy(str, prefix);
+    str[len - 1] = 0;
+    while (number) {
+        *c-- = '0' + (number % 10);
+        number /= 10;
+    }
+
     return str;
 }
 
 static char **cs_get_argname(struct calc_state *cs, unsigned int idx) {
     char *buf;
-    
+
     for (; cs->argnames <= idx; cs->argnames++) {
         buf = make_prefixed_number_string("p", cs->argnames + 1);
         listInsert(cs->symbols, cs->argnames, &buf);
@@ -231,7 +239,7 @@ void cs_update_expect(struct calc_state *cs, struct token *new_tok_p) {
     unsigned int len = cs->expr->length;
 
     cs->exp &= ~(TEFRCall | TEFComma | TECloseParen | TEFArgs);
-    
+
     switch (new_tok_p->type) {
     case Arg:
         if (cs->scope.offset == 0)
@@ -250,8 +258,7 @@ void cs_update_expect(struct calc_state *cs, struct token *new_tok_p) {
                     || tok->value.op == OLCall
                     || tok->value.op == OLp)))
             cs->exp |= TEAssign;
-        // fall through
-    }
+    } // intentionally fall through
     case Const:
     case Number:
         UPDATE_FLAGS(cs->exp,
@@ -285,7 +292,7 @@ void cs_update_expect(struct calc_state *cs, struct token *new_tok_p) {
                 UPDATE_FLAGS(cs->exp,
                              TEBinaryOperator | TEAssign,
                              TEValue);
-        }  // no break
+        }  // intentionally fall through
         case OLp:
         case ORp:
             // do nothing, not the default
@@ -308,8 +315,7 @@ void cs_update_expect(struct calc_state *cs, struct token *new_tok_p) {
                 && cs->scope.offset == 0) {
                 cs->exp = TEFArgs;
                 break;
-            }
-            // no break
+            } // else fall through
         default:
             UPDATE_FLAGS(cs->exp, TEValue, TEBinaryOperator | TEAssign | TEFuncall);
             break;
@@ -392,8 +398,7 @@ void cs_add_item(struct calc_state *cs, struct token new_tok) {
             // set fid here in case of a defun
             cs->prev_fid = fm.fid;
             listPush(cs->fcalls, &fm);
-            // fall through
-        }
+        } // intentionally fall through
         case OLp:
             cs->nesting += 1;
             break;
@@ -402,7 +407,7 @@ void cs_add_item(struct calc_state *cs, struct token new_tok) {
             break;
         case ORCall:
             listRemove(cs->fcalls, 0);
-            // fall through
+            // intentionally fall through
         case ORp:
             cs->nesting -= 1;
             break;
@@ -425,10 +430,9 @@ void cs_add_item(struct calc_state *cs, struct token new_tok) {
     listAppend(cs->expr, &new_tok);
     cs_update_expect(cs, &new_tok);
     const char *s = cs_get_token_text(cs, &new_tok);
-    size_t slen = strlen(s);
-    size_t newbs = cs->str_sz;
-    cs->str_len += slen;
-    newbs = (cs->str_len + CALC_STR_BLOCK_SIZE - 1) / CALC_STR_BLOCK_SIZE;
+    cs->str_len += strlen(s);
+    size_t newbs = CALC_STR_BLOCK_SIZE *
+        (1 + (cs->str_len - 1) / CALC_STR_BLOCK_SIZE);
     if (newbs > cs->str_sz) {
         cs->str = realloc(cs->str, newbs);
         cs->str_sz = newbs;
@@ -442,12 +446,13 @@ void cs_rem_item(struct calc_state *cs) {
     // note: this is the *new* length
     unsigned int len = cs->expr->length - 1;
     struct token *t = GET_PTOKEN(cs->expr, len);
+    size_t slen = strlen(cs_get_token_text(cs, t));
 
     if (t->type == Operator) {
         switch (t->value.op) {
         case OLCall:
             listRemove(cs->fcalls, 0);
-            // fall through
+            // intentionally fall through
         case OLp:
             cs->nesting -= 1;
             break;
@@ -468,8 +473,7 @@ void cs_rem_item(struct calc_state *cs) {
                     fm.arg_idx += 1;
             }
             listPush(cs->fcalls, &fm);
-            // fall through
-        }
+        } // intentionally fall through
         case ORp:
             cs->nesting += 1;
             break;
@@ -482,6 +486,7 @@ void cs_rem_item(struct calc_state *cs) {
              && (TOP_NEW_NAME(cs)->offset == len))
         // automaticaly remove the unneeded symbols here
        cs_remove_unneeded(cs);
+    cs->str_len -= slen;
     cs->str[cs->str_len - 1] = 0;
     listRemove(cs->expr, len);
     cs->exp = TEValue;
@@ -519,9 +524,10 @@ enum calc_input_type cs_interact(struct calc_state *cs,
         cs_eval(cs);
         break;
     case TIISaveToConst:
-        add_const(cs_eval(cs),
-                  make_prefixed_number_string(
-                      "$", ++cs->history_size));
+        cs_add_const(cs,
+                     cs_eval(cs),
+                     make_prefixed_number_string(
+                         "$", ++cs->history_size));
         break;
     case TIISaveToNamedConst:
         cs->cit = ITNC;
@@ -561,26 +567,26 @@ void cs_input_id(struct calc_state *cs, unsigned int id) {
 /* void cs_input_newid(struct calc_state *cs, unsigned int id) { */
 unsigned int cs_input_newid(struct calc_state *cs, char *name) {
     unsigned int id;
+    struct new_name_mark nnm;
     
     switch (cs->cit) {
-        case ITVar:
-            id = add_var(0, cs_add_symbol(cs, name));
-            /* cs_add_symbol(cs, get_var_name(id)); */
-            break;
-        case ITFunc:
-            id = add_func(cs_add_symbol(cs, name));
-            /* cs_add_symbol(cs, get_func_name(id)); */
-            break;
-        case ITNC:
-            return cs_add_const(cs, cs_eval(cs), name);
-            /* cs_add_symbol(cs, get_const_name(id)); */
-        default:
-            /* never reached */
-            return 0;
+    case ITVar:
+        id = add_var(0, cs_add_symbol(cs, name));
+        /* cs_add_symbol(cs, get_var_name(id)); */
+        break;
+    case ITFunc:
+        id = add_func(cs_add_symbol(cs, name));
+        /* cs_add_symbol(cs, get_func_name(id)); */
+        break;
+    case ITNC:
+        return cs_add_const(cs, cs_eval(cs), name);
+        /* cs_add_symbol(cs, get_const_name(id)); */
+    default:
+        /* never reached */
+        return 0;
     }
 
-    struct new_name_mark nnm = (struct new_name_mark){
-        cs->expr->length, cs->cit, id};
+    nnm = (struct new_name_mark){cs->expr->length, cs->cit, id};
     listPush(cs->names, &nnm);
     cs_input_id(cs, id);
     return id;
@@ -591,7 +597,7 @@ void cs_input_newarg(struct calc_state *cs) {
 
     /*
      * why do we use funcall stack for
-     * the currently defined function
+     * the currently defined function?
      */
 
     fm = TOP_FUNCALL(cs);
@@ -603,8 +609,9 @@ void cs_input_newarg(struct calc_state *cs) {
 
 /* NON-INTERACTIVE */
 
-unsigned int cs_add_const(struct calc_state *cs, double val, char *name)
-{
+unsigned int cs_add_const(struct calc_state *cs,
+                          double val,
+                          char *name) {
     return add_const(val, cs_add_symbol(cs, name));
 }
 
@@ -621,7 +628,7 @@ void cs_remove_symbol(struct calc_state *cs, char *sym) {
     struct list_item *prev = NULL;
     struct list_item *current;
     size_t idx;
-    
+
     FOR_LIST_ITEMS(cs->symbols, idx, current) {
         if (LIST_ITEM_REF(char *, current) == sym) {
             *(prev ? &prev->next : &cs->symbols->first) = current->next;
@@ -675,4 +682,3 @@ unsigned int cs_get_func_id(struct calc_state *cs) {
 struct list_head *cs_get_expr(struct calc_state *cs) {
     return cs->expr;
 }
-

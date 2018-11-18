@@ -325,6 +325,29 @@ t_c_E3_ret:
     return res;
 }
 
+int test_cs_Generic1()
+{
+    struct calc_state *cs = cs_create();
+    bool res = true;
+
+    cs_interact(cs, TIINumber);
+    cs_input_number(cs, 2.0);
+    cs_interact(cs, TIISaveToConst);
+
+    cs_clear(cs);
+
+    cs_interact(cs, TIIConst);
+    cs_input_id(cs, count_const() - 1);
+    cs_interact(cs, TIIPlus);
+    cs_interact(cs, TIINumber);
+    cs_input_number(cs, 3.0);
+    cs_interact(cs, TIISaveToConst);
+    res &= ASSERT(get_const(count_const() - 1) == 5.0);
+
+    cs_destroy(cs);
+    return res;
+}
+
 int main() {
     init_calc();
     fid = set_func_func(set_func_args(add_func("tf1+"),
@@ -341,9 +364,9 @@ int main() {
             && test_cs_Scope()
             && test_cs_Expect1()
             && test_cs_Expect2()
-            && test_cs_Expect3();
+            && test_cs_Expect3()
+            && test_cs_Generic1();
     fprintf(stderr, res ? "All ok\n" : "Some tests failed\n");
     destroy_calc();
     return !res;
 }
-

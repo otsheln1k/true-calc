@@ -19,16 +19,16 @@
 
 /* ---===GUI-ELEMENTS-DECLARATIONS===--- */
 
-static Window           *main_window;
-static StatusBarLayer   *statusbar_l;
-static TextLayer        *expr_l;
+static Window *main_window;
+static StatusBarLayer *statusbar_l;
+static TextLayer *expr_l;
 
-static ItemMenuLayer    *tokenmenu_l;
-static MenuLayer        *menu_l;
-static NumberLayer      *number_l;
+static ItemMenuLayer *tokenmenu_l;
+static MenuLayer *menu_l;
+static NumberLayer *number_l;
 
-static CalcState        *calc_state;
-static char             expr_str[EXPR_LINE_TEXT_LEN_MAX + 1];
+static struct calc_state *calc_state;
+static char expr_str[EXPR_LINE_TEXT_LEN_MAX + 1];
 
 void mlc_config(void *ctx);
 
@@ -62,11 +62,8 @@ unsigned int load_const() {
         double val;
         persist_read_data(i * 2 - 1, &val, sizeof(double));
         char buf[SAVED_CONST_NAME_LEN_MAX];
-        int nsz = persist_read_string(i * 2, buf, sizeof(buf));
-        char *n = malloc(nsz);
-        strcpy(n, buf);
-        cs_add_symbol(calc_state, n);
-        add_const(val, n);
+        persist_read_string(i * 2, buf, sizeof(buf));
+        cs_add_const(calc_state, val, buf);
     }
     return c;
 }
@@ -115,24 +112,24 @@ char *alloc_string(char *str) {
     return s1;
 }
 
-TokenItemId getTokenItemId(unsigned int tm_selection) {
+static enum token_item_id getTokenItemId(unsigned int tm_selection) {
     tm_selection += 1;
-    for (TokenItemId t = TIIBackspace;; t++) {
+    for (enum token_item_id t = TIIBackspace;; t++) {
         tm_selection -= cs_show_item(calc_state, t);
         if (!tm_selection)
             return t;
     }
 }
 
-char *getOperatorName(unsigned int idx) {
+static char *getOperatorName(unsigned int idx) {
     return getButtonText(getTokenItemId(idx));  // getButtonText from cs
 }
 
-void cs_callback(CalcState *cs) {
+void cs_callback(struct calc_state *cs) {
     char *s = cs_curr_str(cs);
     size_t slen = strlen(s);
     if (slen <= EXPR_LINE_TEXT_LEN_MAX)
-        text_layer_set_text(expr_l, cs_curr_str(cs));
+        text_layer_set_text(expr_l, s);
     else {
         expr_str[0] = '<';
         strncpy(expr_str + 1, s + slen - EXPR_LINE_TEXT_LEN_MAX, EXPR_LINE_TEXT_LEN_MAX);
@@ -141,7 +138,7 @@ void cs_callback(CalcState *cs) {
     // text_layer_set_text(expr_l, s);  // TODO truncate
 }
 
-void cs_eval_cb(CalcState *cs, double result) {
+void cs_eval_cb(struct calc_state *cs, double result) {
     strcpy(expr_str, "->");
     ftoa(result, expr_str + 2, sizeof(expr_str) - 2);
     text_layer_set_text(expr_l, expr_str);
@@ -216,26 +213,33 @@ void tm_select_cb(ItemMenuLayer *tm, unsigned int idx, void *ctx) {
 /* ---===NUMBER-LAYER-CLICKS===--- */
 
 void nlc_select(NumberLayer *nl, void *ctx) {
-    CalcInputType cit = cs_get_input_type(calc_state);
+    enum calc_input_type cit = cs_get_input_type(calc_state);
     switch (cit) {
-        case ITNumber:  // value chooser
-            cs_input_number(calc_state, number_layer_get_number(nl));
-            break;
-        case ITVar:  // name chooser for the new var/func
-        case ITFunc:
-            {
-                char *name = alloc_string(number_layer_get_string(nl));
-                // cs_add_symbol(calc_state, name);
-                cs_input_newid(calc_state, (cit == ITVar) ? add_var(0, name) : add_func(name));
-            }
-            break;
-        case ITNC:
-            cs_input_newid(calc_state, add_const(
-                        cs_eval(calc_state),
-                        alloc_string(number_layer_get_string(nl))));
-            break;
-        default:
-            return;
+    case ITNumber:  // value chooser
+        cs_input_number(calc_state, number_layer_get_number(nl));
+        break;
+            /*
+    case ITVar:  // name chooser for the new var/func
+    case ITFunc:
+        {
+            char *name = alloc_string(number_layer_get_string(nl));
+            // cs_add_symbol(calc_state, name);
+            cs_input_newid(calc_state, (cit == ITVar) ? add_var(0, name) : add_func(name));
+        }
+        break;
+    case ITNC:
+        cs_input_newid(calc_state, add_const(
+                           cs_eval(calc_state),
+                           alloc_string(number_layer_get_string(nl))));
+        break;
+            */
+    case ITVar:
+    case ITFunc:
+    case ITNC:
+        cs_input_newid(calc_state, number_layer_get_string(nl));
+        break;
+    default:
+        return;
     }
     // switch back
     item_menu_set_click_config_onto_window(tokenmenu_l, main_window);
@@ -244,7 +248,7 @@ void nlc_select(NumberLayer *nl, void *ctx) {
 }
 
 void nlc_back(NumberLayer *nl, void *ctx) {
-    CalcInputType cit = cs_get_input_type(calc_state);
+    enum calc_input_type cit = cs_get_input_type(calc_state);
     if (cit == ITNumber) {
         item_menu_set_click_config_onto_window(tokenmenu_l, main_window);
         layer_set_hidden(item_menu_get_layer(tokenmenu_l), false);
@@ -258,24 +262,44 @@ void nlc_back(NumberLayer *nl, void *ctx) {
 /* ---===MENU-LAYER-CALLBACKS===--- */
 
 uint16_t ml_get_num_rows(MenuLayer *ml, uint16_t idx, void *ctx) {
-    CalcInputType cit = cs_get_input_type(calc_state);
-    return (cit == ITVar || cit == ITFunc) + 
-        ((cit == ITVar) ? count_var() :
-        (cit == ITConst) ? count_const() :
-        (cit == ITFunc) ? count_func() :
-        get_func_argc(cs_get_func_id(calc_state)));
+    switch (cs_get_input_type(calc_state)) {
+    case ITVar:
+        return count_var() + 1;
+    case ITConst:
+        return count_const();
+    case ITFunc:
+        return count_func() + 1;
+    case ITArg:
+        get_func_argc(cs_get_func_id(calc_state));
+    default:
+        /* never reached */
+        return 0;
+    }
 }
 
 void ml_draw_row(GContext *gctx, const Layer *cell_layer, MenuIndex *cell_index, void *ctx) {
-    const CalcInputType cit = cs_get_input_type(calc_state);
     uint16_t row = cell_index->row;
-    menu_cell_basic_draw(gctx, cell_layer,
-            (((cit == ITVar || cit == ITFunc) && !row) ? "+" :
-             (cit == ITVar) ? get_var_name(row - 1) :
-             (cit == ITFunc) ? get_func_name(row - 1) :
-             (cit == ITConst) ? get_const_name(row) :
-             get_func_arg_name(cs_get_func_id(calc_state), row)),
-             NULL, NULL);
+    char *name;
+
+    switch (cs_get_input_type(calc_state)) {
+    case ITVar:
+        name = row ? get_var_name(row - 1) : "+";
+        break;
+    case ITFunc:
+        name = row ? get_func_name(row - 1) : "+";
+        break;
+    case ITConst:
+        name = get_const_name(row);
+        break;
+    case ITArg:
+        name = get_func_arg_name(cs_get_func_id(calc_state), row);
+        break;
+    default:
+        /* never reached */
+        return;
+    }
+
+    menu_cell_basic_draw(gctx, cell_layer, name, NULL, NULL);
 }
 
 /* ---===MENU-LAYER-CLICKS===--- */
@@ -296,7 +320,7 @@ void mlc_back(ClickRecognizerRef rec, void *ctx) {
 
 void mlc_select(ClickRecognizerRef rec, void *ctx) {
     // check whether the [+] item is selected, if so, do smth else
-    CalcInputType cit = cs_get_input_type(calc_state);
+    enum calc_input_type cit = cs_get_input_type(calc_state);
     if (!menu_layer_get_selected_index(menu_l).row && (cit == ITVar || cit == ITFunc)) {
         number_layer_set_identifier(number_l, true);
         number_layer_set_click_config_onto_window(number_l, main_window);

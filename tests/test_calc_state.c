@@ -1,12 +1,13 @@
 #include "test_ut.h"
 #include "eval.h"
+#include "ftoa.h"
 #include "calc_state.h"
 
 /* GLOBAL */
 unsigned int fid;
 
 bool test_cs_1() {
-    CalcState *cs = cs_create();
+    struct calc_state *cs = cs_create();
     cs_add_item(cs, (Token){ Number, 15 });
     cs_add_item(cs, (Token){ Operator, { .op = OAdd } });
     cs_add_item(cs, (Token){ Number, 27 });
@@ -24,7 +25,7 @@ test_failed:
 }
 
 bool test_cs_2() {
-    CalcState *cs = cs_create();
+    struct calc_state *cs = cs_create();
     unsigned int fid0 = set_func_body(set_func_args(add_func("f1"), LIST_CONV(char *, 1, { "p0" })), LIST_CONV(Token, 3, ARG({ { Arg, { .id = 0 } }, { Operator, { .op = OAdd } }, { Number, 10 } })));
     cs_add_item(cs, (Token){ Func, { .id = fid0 } });
     cs_add_item(cs, (Token){ Operator, { .op = OLCall } });
@@ -37,7 +38,7 @@ bool test_cs_2() {
 }
 
 bool test_cs_3() {
-    CalcState *cs = cs_create();
+    struct calc_state *cs = cs_create();
     unsigned int vid = add_var(21., "var_0");
     unsigned int cid = add_const(2., "cst_0");
     cs_add_item(cs, (Token){ Var, { .id = vid } });
@@ -75,7 +76,7 @@ bool test_cs_ftoa() {
 }
 
 bool test_cs_Interact() {
-    CalcState *cs = cs_create();
+    struct calc_state *cs = cs_create();
     unsigned int varid = add_var(15., "var_1");
     cs_interact(cs, TIINumber);
     cs_input_number(cs, 27.);
@@ -90,12 +91,11 @@ bool test_cs_Interact() {
 }
 
 bool test_cs_InteractiveVar() {
-    CalcState *cs = cs_create();
+    struct calc_state *cs = cs_create();
     cs_interact(cs, TIIVar);
     char *n = malloc(4);
     strcpy(n, "v_2");
-    unsigned int vid = add_var(0, n);
-    cs_input_newid(cs, vid);
+    unsigned int vid = cs_input_newid(cs, n);
     cs_interact(cs, TIIAssign);
     cs_interact(cs, TIINumber);
     cs_input_number(cs, 21.);
@@ -112,7 +112,7 @@ bool test_cs_InteractiveVar() {
 }
 
 bool test_cs_Nesting() {
-    CalcState *cs = cs_create();
+    struct calc_state *cs = cs_create();
     cs_interact(cs, TIILParen);
     if (!ASSERT(cs->nesting == 1)) { bool res = false; goto t_c_N_ret; }
     cs_interact(cs, TIINumber);
@@ -135,13 +135,14 @@ t_c_N_ret:
 }
 
 bool test_cs_Stack() {
-    CalcState *cs = cs_create();
+    struct calc_state *cs = cs_create();
     cs_interact(cs, TIIFunction);
     cs_input_id(cs, fid);
     cs_interact(cs, TIILFuncall);
     bool res = ASSERT(cs->fcalls->length == 1);
     if (!res) goto t_c_S_ret;
-    FuncallMark *fmp = LIST_DATA(FuncallMark, cs->fcalls, 0);
+    struct funcall_mark *fmp =
+        LIST_DATA(struct funcall_mark, cs->fcalls, 0);
     res &= ASSERT(fmp->fid == fid)
         && ASSERT(fmp->nesting_level == 0)
         && ASSERT(fmp->arg_idx == 0);
@@ -162,7 +163,7 @@ t_c_S_ret:
 }
 
 bool test_cs_Scope() {
-    CalcState *cs = cs_create();
+    struct calc_state *cs = cs_create();
     cs_interact(cs, TIIFunction);
     unsigned int fid1 = add_func("newf");
     cs_input_id(cs, fid1);          // check cs_input_newid
@@ -199,7 +200,7 @@ PREDEF_ONELINE_FUNC(test_func_oneplus, args, argv,
 #define FINAL_ASSERT(var, expr, mark, ...) { var &= ASSERT(expr); if (!var) { __VA_ARGS__ ; goto mark; } }
 
 bool test_cs_Expect1() {
-    CalcState *cs = cs_create();
+    struct calc_state *cs = cs_create();
     bool res = true;
     cs_interact(cs, TIINumber);
     cs_input_number(cs, 126);
@@ -235,7 +236,7 @@ t_c_E_ret:
 }
 
 int test_cs_Expect2() {
-    CalcState *cs = cs_create();
+    struct calc_state *cs = cs_create();
     bool res = true;
     unsigned int varid1 = add_var(2., "var_1");
     cs_interact(cs, TIILParen);
@@ -265,7 +266,7 @@ t_c_E2_ret:
 }
 
 int test_cs_Expect3() {
-    CalcState *cs = cs_create();
+    struct calc_state *cs = cs_create();
     bool res = true;
     unsigned int fid0 = add_func("f1");
     unsigned int varid = add_var(0, "var_2");
@@ -276,7 +277,6 @@ int test_cs_Expect3() {
     FINAL_ASSERT(res, cs->exp == (TEValue | TEFRCall | TEFArgs), t_c_E3_ret,
             fprintf(stderr, "%d\n", cs->exp));
     cs_interact(cs, TIIAddArg);
-    cs_input_newarg(cs);
     FINAL_ASSERT(res, cs->exp == (TEFRCall | TEFComma), t_c_E3_ret,
             fprintf(stderr, "%d\n", cs->exp));
     cs_interact(cs, TIIRFuncall);

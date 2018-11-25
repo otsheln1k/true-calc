@@ -76,6 +76,13 @@ struct calc_state {
     // funcall_mark list
     struct list_head *fcalls;
     unsigned int prev_fid;
+    size_t defun_idx;
+    enum defun_status {
+        MAY_BE_DEFUN, IS_NOT_DEFUN, IS_DEFUN, INSIDE_DEFUN,
+    } defun_p;
+    enum subexpr_status {
+        SUBEXPR_BEGIN, SUBEXPR_LVALUE, SUBEXPR_NOT_LVALUE,
+    } subexpr;
     // which menu to open and type for new ids (via c9_input_newid)
     enum calc_input_type cit;
     // new_name_mark list

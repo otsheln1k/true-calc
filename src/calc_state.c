@@ -11,32 +11,22 @@
  * Add ‘name’ field to ‘struct new_name_mark’?
  */
 
+/*
+ * Function redefinition seems to be allowed.
+ * Should it be?
+ */
+
 
 /* KNOWN BUGS */
 
 /*
- * Currently, inline defuns are allowed but don’t work
- * This is a bug (in case you haven’t noticed)
- */
-
-/*
- * Function redefinition also seems to be allowed
- */
-
-/*
  * Calling an undefined (not-yet-defined) function
- * should be undefined/forbidden
+ * should be forbidden (or zero)
  */
 
 /*
  * true-calc crashes when evaluating a zero-argument
  * function; it’s a bug
- */
-
-/*
- * Recursion is allowed but can’t be evaluated because
- * of the lack of lazy or conditional evaluation
- * facitilies
  */
 
 /*
@@ -46,15 +36,18 @@
  */
 
 /*
- * More effective list access?
- * Keep the list tail in calc state
- * Thus, we could add tokens in O(1) (though remove in O(n))
+ * We could push tokens to head; then reverse and evaluate
  *
- * Even better, we could push tokens to head; then reverse
- * and evaluate
- *
- * For now, consider inefficient token list storage/access
+ * For now, treat inefficient token list storage/access
  * as a bug
+ */
+
+/*
+ * Identifiers/arguments leak (possibly) after backspacing.
+ */
+
+/*
+ * Function names are inserted in place of argument names
  */
 
 
@@ -172,6 +165,7 @@ static void cs_reset(struct calc_state *cs) {
     cs->str_len = 1;  // null-terminated string
     cs->no_cb = 0;
     cs->cit = ITNone;
+    cs->defun_p = MAY_BE_DEFUN;
 }
 
 struct calc_state *cs_create() {
@@ -190,9 +184,9 @@ struct calc_state *cs_create() {
 }
 
 double cs_eval(struct calc_state *cs) {
-    // ???
-    // apply names here
     listClear(cs->names);
+    // EXPR LIST ACCESS
+    // just reverse the list
     double res = eval_expr(cs_get_expr(cs), 0);
     if (cs->eval_cb != NULL)
         cs->eval_cb(cs, res);
@@ -229,124 +223,83 @@ void cs_set_cb(struct calc_state *cs,
 #define UPDATE_FLAGS(lvalue, addf, remf) { lvalue |= addf; lvalue &= ~(remf); }
 
 
-/*
- * Most bugs can be fixed by making certain token sequencies
- * firbidden
- */
-void cs_update_expect(struct calc_state *cs, struct token *new_tok_p) {
-    // defun check: ORCall, prev is Arg, cs.defun.offset == 0
-    // set var check: Var, either the first token or prev is OComma or OLCall or OLp
-    unsigned int len = cs->expr->length;
+enum token_exp _cs_update_expect(struct calc_state *cs,
+                                 struct token *new_tok_p)
+{
+    enum token_exp more = 0;
 
-    cs->exp &= ~(TEFRCall | TEFComma | TECloseParen | TEFArgs);
+    if (!new_tok_p)
+        return TEValue;
 
     switch (new_tok_p->type) {
-    case Arg:
-        if (cs->scope.offset == 0)
-            cs->exp = TEFRCall | TEFComma;
-        else
-            UPDATE_FLAGS(cs->exp,
-                         TEBinaryOperator,
-                         TEValue | TEFuncall);
-        break;
-    case Var: {
-        struct token *tok;
-        if (len == 1
-            || (len > 1
-                && ((tok = GET_PTOKEN(cs->expr, len - 2))->type == Operator)
-                && (tok->value.op == OComma
-                    || tok->value.op == OLCall
-                    || tok->value.op == OLp)))
-            cs->exp |= TEAssign;
-    } // intentionally fall through
-    case Const:
-    case Number:
-        UPDATE_FLAGS(cs->exp,
-                     TEBinaryOperator,
-                     TEValue | TEFuncall);
-        // ???
-        // special for funcall
-        // special for defun
-        break;
-    case Func:
-        UPDATE_FLAGS(cs->exp,
-                     TEFuncall,
-                     TEValue | TEBinaryOperator | TEAssign);
-        break;
     case Operator:
         switch (new_tok_p->value.op) {
-        case ORCall: {
-            // may trigger TEAssign for the defun
-            struct token *prev = GET_PTOKEN(cs->expr, len - 2);
-
-            /* this one seems to be an error:
-             * f ( _)_ [can assign]
-             * f ( a1, a2 _)_ [can assign]
-             * v1 + f ( _)_ [cannot assign here]
-             */
-            if (prev->type == Arg
-                && cs->scope.offset == 0)
-                cs->exp |= TEAssign;
-            else if (prev->type == Operator
-                     && prev->value.op == OLCall)
-                UPDATE_FLAGS(cs->exp,
-                             TEBinaryOperator | TEAssign,
-                             TEValue);
-        }  // intentionally fall through
-        case OLp:
-        case ORp:
-            // do nothing, not the default
-            break;
-        case OAssign:
-            // TEFArgs is set below
-            UPDATE_FLAGS(cs->exp, TEValue, TEBinaryOperator | TEAssign);
-            break;
+        case ORCall:
+            switch (cs->defun_p) {
+            case IS_DEFUN:
+                return TEAssign;
+            case MAY_BE_DEFUN:
+                more |= TEAssign;
+                // intentionally fall through
+            default:
+                goto cs_update_expect_binary_op;
+            }
+            // never reached
         case OLCall:
-            // check if defun is possible - is 2nd token
-            if (len == 2)
-                cs->exp |= TEFArgs;
-            UPDATE_FLAGS(cs->exp,
-                         TEValue | TEFRCall,
-                         TEBinaryOperator | TEAssign | TEFuncall);
+            switch (cs->defun_p) {
+            case IS_DEFUN:
+                return TEFRCall | TEFArgs;
+            case MAY_BE_DEFUN:
+                more |= TEFRCall | TEFArgs;
+                break;
+            default:
+                more |= TEFRCall;
+                break;
+            }
             break;
         case OComma:
-            // special if prev is Arg and no defun
-            if (GET_PTOKEN(cs->expr, len - 2)->type == Arg
-                && cs->scope.offset == 0) {
-                cs->exp = TEFArgs;
-                break;
-            } // else fall through
-        default:
-            UPDATE_FLAGS(cs->exp, TEValue, TEBinaryOperator | TEAssign | TEFuncall);
+            if (cs->defun_p == IS_DEFUN)
+                return TEFArgs;
+            break;
+       case ORp:
+            goto cs_update_expect_binary_op;
+         default:
+            // expect a value
             break;
         }
-        break;
+        // intentionally fall through
     case UOperator:
-        // UOp -> as-is
-    default:
-        break;
+        if (cs->defun_p == INSIDE_DEFUN)
+            more |= TEFArgs;
+        return more | TEValue;
+    case Arg:
+        if (cs->scope.offset == 0)
+            return TEFComma | TEFRCall;
+        // else fall through
+    case Var:
+        if (cs->subexpr == SUBEXPR_LVALUE)
+            more |= TEAssign;
+        // intentionally fall through
+    cs_update_expect_binary_op:
+    case Const:
+    case Number:
+        if (cs->nesting) {
+            more |=
+                (cs->fcalls->length == 0
+                 || cs->nesting - 1 > TOP_FUNCALL(cs)->nesting_level)
+                ? TECloseParen
+                : (TEFComma | TEFRCall);
+        }
+        return more | TEBinaryOperator;
+    case Func:
+        return TEFuncall;
     }
+    // never reached
+    return TENone;
+}
 
-    if ((new_tok_p->type != Operator
-         || (new_tok_p->type == Operator &&
-             (new_tok_p->value.op == ORp
-              || new_tok_p->value.op == ORCall)))
-        && new_tok_p->type != UOperator
-        && cs->fcalls->length
-        && cs->nesting - 1 == TOP_FUNCALL(cs)->nesting_level
-        && cs->exp & TEBinaryOperator) {
-        cs->exp |= TEFRCall | TEFComma;
-    } else if (new_tok_p->type != Operator
-               && new_tok_p->type != UOperator
-               && cs->nesting
-               && (!cs->fcalls->length
-                   || (cs->nesting - 1) !=
-                   TOP_FUNCALL(cs)->nesting_level)) {
-        cs->exp |= TECloseParen;
-    }
-
-    if (cs->scope.offset != 0 && cs->exp & TEValue)
-        cs->exp |= TEFArgs;
+void cs_update_expect(struct calc_state *cs, struct token *new_tok_p) {
+    cs->exp = _cs_update_expect(cs, new_tok_p);
 }
 
 int cs_show_item(struct calc_state *cs, enum token_item_id tii) {
@@ -387,12 +340,50 @@ int cs_show_item(struct calc_state *cs, enum token_item_id tii) {
 /* ADD/REMOVE TOKENS */
 
 void cs_add_item(struct calc_state *cs, struct token new_tok) {
+    if (cs->defun_p == MAY_BE_DEFUN) {
+        cs->defun_idx = cs->expr->length;
+        switch (cs->expr->length) {
+        case 0:
+            if (new_tok.type != Func)
+                cs->defun_p = IS_NOT_DEFUN;
+            break;
+        case 1:
+            if (new_tok.type != Operator
+                || new_tok.value.op != OLCall)
+                cs->defun_p = IS_NOT_DEFUN;
+            break;
+        case 2:
+            cs->defun_p =
+                (new_tok.type == Arg) ? IS_DEFUN
+                : (new_tok.type == Operator
+                   && new_tok.value.op == ORCall) ? MAY_BE_DEFUN
+                : IS_NOT_DEFUN;
+            break;
+        case 3:
+            cs->defun_p = (new_tok.type == Operator
+                           && new_tok.value.op == OAssign)
+                ? INSIDE_DEFUN : IS_NOT_DEFUN;
+            break;
+        default:
+            // never reached
+            break;
+        }
+    } else if (cs->defun_p == IS_DEFUN
+               && new_tok.type == Operator
+               && new_tok.value.op == OAssign) {
+        cs->defun_p = INSIDE_DEFUN;
+    }
+
+    enum subexpr_status subexpr = cs->subexpr;
+    cs->subexpr = SUBEXPR_NOT_LVALUE;
+
     if (new_tok.type == Operator) {
         // special actions for special types of Tokens
         switch (new_tok.value.op) {
         case OLCall: {
             struct funcall_mark fm;
             fm.nesting_level = cs->nesting;
+            // EXPR LIST ACCESS
             fm.fid = GET_PTOKEN(cs->expr, cs->expr->length - 1)->value.id;
             fm.arg_idx = 0;
             // set fid here in case of a defun
@@ -401,9 +392,11 @@ void cs_add_item(struct calc_state *cs, struct token new_tok) {
         } // intentionally fall through
         case OLp:
             cs->nesting += 1;
+            cs->subexpr = SUBEXPR_BEGIN;
             break;
         case OComma:
             TOP_FUNCALL(cs)->arg_idx += 1;
+            cs->subexpr = SUBEXPR_BEGIN;
             break;
         case ORCall:
             listRemove(cs->fcalls, 0);
@@ -413,6 +406,7 @@ void cs_add_item(struct calc_state *cs, struct token new_tok) {
             break;
         case OAssign: {
             unsigned int len = cs->expr->length;
+            // EXPR LIST ACCESS
             struct token *prev = GET_PTOKEN(cs->expr, len - 1);
             if (prev->type == Operator && prev->value.op == ORCall) {
                 // it's a defun
@@ -426,7 +420,11 @@ void cs_add_item(struct calc_state *cs, struct token new_tok) {
         default:
             break;
         }
+    } else if (subexpr == SUBEXPR_BEGIN && new_tok.type == Var) {
+        cs->subexpr = SUBEXPR_LVALUE;
     }
+
+    // EXPR LIST ACCESS
     listAppend(cs->expr, &new_tok);
     cs_update_expect(cs, &new_tok);
     const char *s = cs_get_token_text(cs, &new_tok);
@@ -442,11 +440,51 @@ void cs_add_item(struct calc_state *cs, struct token new_tok) {
     cs_call_cb(cs);
 }
 
+static inline int begins_subexpr(struct token *token)
+{
+    if (token->type != Operator)
+        return 0;
+    switch (token->value.op) {
+    case OLp:
+    case OLCall:
+    case OComma:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
 void cs_rem_item(struct calc_state *cs) {
     // note: this is the *new* length
     unsigned int len = cs->expr->length - 1;
+    // EXPR LIST ACCESS
     struct token *t = GET_PTOKEN(cs->expr, len);
     size_t slen = strlen(cs_get_token_text(cs, t));
+
+    // EXPR LIST ACCESS
+    if (len == 0
+        || begins_subexpr(GET_PTOKEN(cs->expr, len - 1)))
+        cs->subexpr = SUBEXPR_BEGIN;
+    else if (len >= 2
+             && GET_PTOKEN(cs->expr, len - 1)->type == Var
+             && begins_subexpr(GET_PTOKEN(cs->expr, len - 2)))
+        cs->subexpr = SUBEXPR_LVALUE;
+    else
+        cs->subexpr = SUBEXPR_NOT_LVALUE;
+
+    switch (cs->defun_p) {
+    case INSIDE_DEFUN:
+        if (t->type == Operator && t->value.op == OAssign)
+            cs->defun_p = IS_DEFUN;
+        // intentionally fall through
+    case IS_DEFUN:
+    case IS_NOT_DEFUN:
+        if (cs->defun_idx == len)
+            cs->defun_p = MAY_BE_DEFUN;
+        break;
+    default:
+        break;
+    }
 
     if (t->type == Operator) {
         switch (t->value.op) {
@@ -462,6 +500,9 @@ void cs_rem_item(struct calc_state *cs) {
         case ORCall: {
             struct funcall_mark fm;
             fm.nesting_level = cs->nesting + 1;
+            // TODO: rewrite
+            // EXPR LIST ACCESS
+            // wtf?
             FOR_LIST_COUNTER(cs->expr, tindex, struct token, token) {
                 if (token->type == Func) {
                     struct token *ntoken = getListNextItem(token);
@@ -477,6 +518,9 @@ void cs_rem_item(struct calc_state *cs) {
         case ORp:
             cs->nesting += 1;
             break;
+        case OAssign:
+            cs->subexpr = SUBEXPR_LVALUE;
+            break;
         default:
             break;
         }
@@ -488,9 +532,13 @@ void cs_rem_item(struct calc_state *cs) {
        cs_remove_unneeded(cs);
     cs->str_len -= slen;
     cs->str[cs->str_len - 1] = 0;
+    // EXPR LIST ACCESS
     listRemove(cs->expr, len);
     cs->exp = TEValue;
     // re-expect
+    // EXPR LIST ACCESS
+    // wtf?
+    // TODO: well, I guess it will be easier
     FOR_LIST_COUNTER(cs->expr, idx, struct token, tok)
         cs_update_expect(cs, tok);
     // callback
@@ -568,7 +616,7 @@ void cs_input_id(struct calc_state *cs, unsigned int id) {
 unsigned int cs_input_newid(struct calc_state *cs, char *name) {
     unsigned int id;
     struct new_name_mark nnm;
-    
+
     switch (cs->cit) {
     case ITVar:
         id = add_var(0, cs_add_symbol(cs, name));

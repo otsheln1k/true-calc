@@ -325,8 +325,7 @@ t_c_E3_ret:
     return res;
 }
 
-int test_cs_Generic1()
-{
+int test_cs_Generic1() {
     struct calc_state *cs = cs_create();
     bool res = true;
 
@@ -348,24 +347,98 @@ int test_cs_Generic1()
     return res;
 }
 
+int test_cs_Expect4() {
+    struct calc_state *cs = cs_create();
+    bool res = true;
+
+    struct {
+        enum token_item_id tii;
+        union {
+            double number;
+            char *name;
+        } value;
+    } input[] = {
+        { TIILParen },
+        { TIINumber, { .number = 2.0 }},
+        { TIIMultiply },
+        { TIILParen },
+        { TIIVar, { .name = "t_c_E4_v1" } },
+        { TIIAssign },
+        { TIINumber, { .number = 1.0 } },
+        { TIIPlus },
+        { TIINumber, { .number = 2.0 } },
+        { TIIRParen },
+        { TIIRParen },
+        { TIIPower },
+        { TIINumber, { .number = 4.0 } }
+    };
+
+    enum token_exp exps[] = {
+        TEValue,
+        TEValue,
+        TEBinaryOperator | TECloseParen,
+        TEValue,
+        TEValue,
+        TEBinaryOperator | TECloseParen | TEAssign,
+        TEValue,
+        TEBinaryOperator | TECloseParen,
+        TEValue,
+        TEBinaryOperator | TECloseParen,
+        TEBinaryOperator | TECloseParen,
+        TEBinaryOperator,
+        TEValue,
+        TEBinaryOperator
+    };
+
+    size_t len = sizeof(input) / sizeof(*input);
+    for (size_t i = 0; i <= len; i++) {
+        FINAL_ASSERT(res, cs->exp == exps[i], t_c_E4_ret,
+                     fprintf(stderr, "input#%zu\n", i));
+        if (i < len) {
+            cs_interact(cs, input[i].tii);
+            switch (input[i].tii) {
+            case TIINumber:
+                cs_input_number(cs, input[i].value.number);
+                break;
+            case TIIVar:
+                cs_input_newid(cs, input[i].value.name);
+                break;
+            default:
+                break;
+            }
+        }
+    }
+    res &= ASSERT(cs_eval(cs) == 1296);
+    for (size_t i = 0; i < len; i++) {
+        cs_interact(cs, TIIBackspace);
+        FINAL_ASSERT(res, cs->exp == exps[len - 1 - i], t_c_E4_ret,
+                     fprintf(stderr, "input#%zu\n", i));
+    }
+
+ t_c_E4_ret:
+    cs_destroy(cs);
+    return res;
+}
+
 int main() {
     init_calc();
     fid = set_func_func(set_func_args(add_func("tf1+"),
-                LIST_CONV(char *, 2, ARG({ "x", "y" }))),
-            test_func_oneplus);
+                                      LIST_CONV(char *, 2, ARG({ "x", "y" }))),
+                        test_func_oneplus);
     bool res = test_cs_1()
-            && test_cs_ftoa()
-            && test_cs_2()
-            && test_cs_3()
-            && test_cs_Interact()
-            && test_cs_InteractiveVar()
-            && test_cs_Nesting()
-            && test_cs_Stack()
-            && test_cs_Scope()
-            && test_cs_Expect1()
-            && test_cs_Expect2()
-            && test_cs_Expect3()
-            && test_cs_Generic1();
+        && test_cs_ftoa()
+        && test_cs_2()
+        && test_cs_3()
+        && test_cs_Interact()
+        && test_cs_InteractiveVar()
+        && test_cs_Nesting()
+        && test_cs_Stack()
+        && test_cs_Scope()
+        && test_cs_Expect1()
+        && test_cs_Expect2()
+        && test_cs_Expect3()
+        && test_cs_Generic1()
+        && test_cs_Expect4();
     fprintf(stderr, res ? "All ok\n" : "Some tests failed\n");
     destroy_calc();
     return !res;

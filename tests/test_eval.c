@@ -137,6 +137,16 @@ bool test_eval_ieeeFp() {
         && ASSERT(FP_EQ(ieee_fmod(0.03, 0.01), 0.0));
 }
 
+bool test_eval_zeroArglist() {
+    unsigned int fid = set_func_body(set_func_args(add_func("zaf"),
+                                                   makeList(sizeof(char *))),
+                                     LIST_CONV(struct token, 1, ARG({{ Number, {.number = 42.0} }})));
+    struct list_head *expr =
+        LIST_CONV(struct token, 5,
+                  ARG({{Func, {.id = fid} }, {Operator, {.op = OLCall}}, {Operator, {.op = ORCall}}, {Operator, {.op = OAdd}}, {Number, {.number = 12.0}}}));
+    return ASSERT(eval_expr(expr, 0) == 54.0);
+}
+
 int main() {
     init_calc();
     bool res =
@@ -148,7 +158,8 @@ int main() {
         && test_eval_assignExpr2()
         && test_eval_PredefinedFuncs()
         && test_eval_RedefineFunc()
-        && test_eval_ieeeFp();
+        && test_eval_ieeeFp()
+        && test_eval_zeroArglist();
     if (res)
         fprintf(stderr, "All ok\n");
     destroy_calc();

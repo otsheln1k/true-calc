@@ -7,26 +7,17 @@
 #include "ftoa.h"
 
 
-/*
- * Add ‘name’ field to ‘struct new_name_mark’?
- */
-
-/*
- * Function redefinition seems to be allowed.
- * Should it be?
- */
-
-
 /* KNOWN BUGS */
 
 /*
  * Calling an undefined (not-yet-defined) function
- * should be forbidden (or zero)
- */
-
-/*
- * true-calc crashes when evaluating a zero-argument
- * function; it’s a bug
+ * should be forbidden (or zero).
+ * Set a flag: NOT_DEFINED on each not-yet-defined
+ * function. Calling such function returns an error.
+ *
+ * When redefining a function, set that flag to
+ * BEGING_REDEFINED. Keep the arg list and
+ * expression list in the calc state structure
  */
 
 /*

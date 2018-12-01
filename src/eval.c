@@ -161,16 +161,19 @@ struct list_head *eval_arglist_es(struct eval_state *e,
         props = token_props(t);
         if (!nesting && t->type == Operator
             && (t->value.op == OComma || t->value.op == ORCall)) {
-            part = takeListItems(first,
-                                 idx - first_idx,
-                                 tokens->elt_size);
-            listInsert(hd, 0, &part);
+            if (idx > first_idx) {
+                part = takeListItems(first,
+                                     idx - first_idx,
+                                     tokens->elt_size);
+                listInsert(hd, 0, &part);
+            }
             if (t->value.op == ORCall)
                 break;
             first = iter->next;
             first_idx = idx + 1;
         }
-        if (props) nesting += props->nesting;
+        if (props)
+            nesting += props->nesting;
     }
 
     listReverse(hd);

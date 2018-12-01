@@ -35,11 +35,6 @@
  * // EXPR LIST ACCESS
  */
 
-/*
- * Identifiers/arguments leak (possibly) after backspacing.
- * Argument names shouldn't be erased (they're shared)
- */
-
 
 /* NOT-YET-KNOWN BUGS */
 
@@ -235,7 +230,11 @@ void cs_remove_symbol(struct calc_state *cs, char *sym) {
 }
 
 void cs_remove_unneeded(struct calc_state *cs) {
-    struct new_name_mark *nnm = TOP_NEW_NAME(cs);
+    struct new_name_mark *nnm;
+    
+    if (cs->names->length == 0
+        || (nnm = TOP_NEW_NAME(cs))->offset < cs->expr->length - 1)
+        return;
 
     switch (nnm->type) {
         case ITVar:
@@ -524,7 +523,8 @@ void cs_rem_item(struct calc_state *cs) {
         break;
     }
 
-    if (t->type == Operator) {
+    switch (t->type) {
+    case Operator:
         switch (t->value.op) {
         case OLCall:
             listRemove(cs->fcalls, 0);
@@ -562,12 +562,28 @@ void cs_rem_item(struct calc_state *cs) {
         default:
             break;
         }
-    }
-    else if (t->type != Number && t->type != UOperator
-             && cs->names->length
-             && (TOP_NEW_NAME(cs)->offset == len))
+        break;
+    case Arg:
+        if (cs->defun_p != INSIDE_DEFUN) {
+            struct list_head *fargs = get_func_args(TOP_FUNCALL(cs)->fid);
+            listRemove(fargs, fargs->length - 1);
+        }
+        break;
+    case Var:
+    case Const:
+    case Func:
+        cs_remove_unneeded(cs);
+        break;
+    default:
+        break;
+        /*
+          && cs->names->length
+          && (TOP_NEW_NAME(cs)->offset == len)
+        */
         // automaticaly remove the unneeded symbols here
-       cs_remove_unneeded(cs);
+        /* cs_remove_unneeded(cs); */
+    /* } */
+    }
     cs->str_len -= slen;
     cs->str[cs->str_len - 1] = 0;
     // EXPR LIST ACCESS
@@ -629,13 +645,11 @@ enum calc_input_type cs_interact(struct calc_state *cs,
 }
 
 void cs_input_number(struct calc_state *cs, double num) {
-    if (cs->cit == ITNumber)
-        cs_add_item(cs, (struct token){
-                Number, (TokenValue){ .number = num }});
+    cs_add_item(cs, (struct token){
+            Number, (TokenValue){ .number = num }});
 }
 
 void cs_input_id(struct calc_state *cs, unsigned int id) {
-    /* if (cs->cit >= ITVar) */
     cs_add_item(cs, (struct token){
             CIT_TO_TOKEN_TYPE(cs->cit), { .id = id }});
 }
@@ -658,15 +672,12 @@ unsigned int cs_input_newid(struct calc_state *cs, char *name) {
     switch (cs->cit) {
     case ITVar:
         id = add_var(0, cs_add_symbol(cs, name));
-        /* cs_add_symbol(cs, get_var_name(id)); */
         break;
     case ITFunc:
         id = add_func(cs_add_symbol(cs, name));
-        /* cs_add_symbol(cs, get_func_name(id)); */
         break;
     case ITNC:
         return cs_add_const(cs, cs_eval(cs), name);
-        /* cs_add_symbol(cs, get_const_name(id)); */
     default:
         /* never reached */
         return 0;

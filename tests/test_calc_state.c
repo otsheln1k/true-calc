@@ -420,6 +420,48 @@ int test_cs_Expect4() {
     return res;
 }
 
+bool test_cs_String() {
+    struct calc_state *cs = cs_create();
+    bool res = true;
+
+    cs_interact(cs, TIIFunction);
+    unsigned fid = cs_input_newid(cs, "f");
+    cs_interact(cs, TIILFuncall);
+    cs_interact(cs, TIIAddArg);
+    cs_interact(cs, TIIRFuncall);
+    cs_interact(cs, TIIAssign);
+    cs_interact(cs, TIIArg);
+    cs_input_id(cs, 0);
+
+    cs_eval(cs);
+    cs_clear(cs);
+
+    cs_interact(cs, TIIFunction);
+    cs_input_newid(cs, "g");
+    cs_interact(cs, TIILFuncall);
+    cs_interact(cs, TIIAddArg);
+    cs_interact(cs, TIIComma);
+    cs_interact(cs, TIIAddArg);
+    cs_interact(cs, TIIRFuncall);
+    cs_interact(cs, TIIAssign);
+    cs_interact(cs, TIIFunction);
+    cs_input_id(cs, fid);
+    cs_interact(cs, TIILFuncall);
+    cs_interact(cs, TIIArg);
+    cs_input_id(cs, 1);
+    cs_interact(cs, TIIRFuncall);
+
+    FINAL_ASSERT(res, !strcmp(cs_curr_str(cs), "g(p1,p2)=f(p2)"), t_c_Str_ret,
+                 fprintf(stderr, "actual string: \"%s\"\n", cs_curr_str(cs)));
+    
+    cs_eval(cs);
+    cs_clear(cs);
+
+ t_c_Str_ret:
+    cs_destroy(cs);
+    return res;
+}
+
 int main() {
     init_calc();
     fid = set_func_func(set_func_args(add_func("tf1+"),
@@ -438,7 +480,8 @@ int main() {
         && test_cs_Expect2()
         && test_cs_Expect3()
         && test_cs_Generic1()
-        && test_cs_Expect4();
+        && test_cs_Expect4()
+        && test_cs_String();
     fprintf(stderr, res ? "All ok\n" : "Some tests failed\n");
     destroy_calc();
     return !res;

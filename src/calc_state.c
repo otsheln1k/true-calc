@@ -30,24 +30,14 @@
  */
 
 /*
- * Not sure but it seems to me that there’s a bug
- * in ‘cs_get_token_text’ (case Arg): we don’t need
- * argument name of an already defined func
- */
-
-/*
  * We could push tokens to head; then reverse and evaluate
- *
- * For now, treat inefficient token list storage/access
- * as a bug
+ * All code that will be affected is marked:
+ * // EXPR LIST ACCESS
  */
 
 /*
  * Identifiers/arguments leak (possibly) after backspacing.
- */
-
-/*
- * Function names are inserted in place of argument names
+ * Argument names shouldn't be erased (they're shared)
  */
 
 
@@ -93,16 +83,6 @@ static char *make_prefixed_number_string(const char *prefix,
     return str;
 }
 
-static char **cs_get_argname(struct calc_state *cs, unsigned int idx) {
-    char *buf;
-
-    for (; cs->argnames <= idx; cs->argnames++) {
-        buf = make_prefixed_number_string("p", cs->argnames + 1);
-        listInsert(cs->symbols, cs->argnames, &buf);
-    }
-    return LIST_DATA(char *, cs->symbols, idx);
-}
-
 
 const char *getButtonText(enum token_item_id tii) {
     static const char *button_strings[] = {
@@ -144,11 +124,10 @@ const char *cs_get_token_text(struct calc_state *cs, struct token *token) {
         else
             return "-";
     case Arg:
-        // TODO: might be a bug
         return get_func_arg_name(
-            (cs->fcalls->length
-             ? TOP_FUNCALL(cs)->fid
-             : cs->scope.fid),
+            (cs->defun_p == INSIDE_DEFUN)
+            ? cs->scope.fid
+            : TOP_FUNCALL(cs)->fid,
             token->value.id);
     default:
         return "error";
@@ -219,6 +198,65 @@ void cs_set_cb(struct calc_state *cs,
     cs->callback = cb;
     cs->eval_cb = ecb;
 }
+
+/* SYMBOL STORAGE */
+
+static char **cs_get_argname(struct calc_state *cs, unsigned int idx) {
+    char *buf;
+
+    for (; cs->argnames <= idx; cs->argnames++) {
+        buf = make_prefixed_number_string("p", cs->argnames + 1);
+        listInsert(cs->symbols, cs->argnames, &buf);
+    }
+    return LIST_DATA(char *, cs->symbols, idx);
+}
+
+char *cs_add_symbol(struct calc_state *cs, char *sym) {
+    char *heap_sym = alloc_string(sym);
+    listAppend(cs->symbols, &heap_sym);
+    return heap_sym;
+}
+
+void cs_remove_symbol(struct calc_state *cs, char *sym) {
+    struct list_item *prev = NULL;
+    struct list_item *current;
+    size_t idx;
+
+    FOR_LIST_ITEMS(cs->symbols, idx, current) {
+        if (LIST_ITEM_REF(char *, current) == sym) {
+            *(prev ? &prev->next : &cs->symbols->first) = current->next;
+            free(current);
+            break;
+        }
+        prev = current;
+    }
+
+    free(sym);
+}
+
+void cs_remove_unneeded(struct calc_state *cs) {
+    struct new_name_mark *nnm = TOP_NEW_NAME(cs);
+
+    switch (nnm->type) {
+        case ITVar:
+            cs_remove_symbol(cs, get_var_name(nnm->id));
+            remove_var(nnm->id);
+            break;
+        case ITFunc:
+            cs_remove_symbol(cs, get_func_name(nnm->id));
+            remove_func(nnm->id);
+            break;
+        default:
+            /* args use persistent names;
+             * constants (incl. named) cannot be inserted,
+             * and so cannot be removed
+             */
+            break;
+    }
+
+    listRemove(cs->names, 0);
+}
+
 
 #define UPDATE_FLAGS(lvalue, addf, remf) { lvalue |= addf; lvalue &= ~(remf); }
 
@@ -661,55 +699,6 @@ unsigned int cs_add_const(struct calc_state *cs,
                           double val,
                           char *name) {
     return add_const(val, cs_add_symbol(cs, name));
-}
-
-
-/* SYMBOL STORAGE */
-
-char *cs_add_symbol(struct calc_state *cs, char *sym) {
-    char *heap_sym = alloc_string(sym);
-    listPush(cs->symbols, &heap_sym);
-    return heap_sym;
-}
-
-void cs_remove_symbol(struct calc_state *cs, char *sym) {
-    struct list_item *prev = NULL;
-    struct list_item *current;
-    size_t idx;
-
-    FOR_LIST_ITEMS(cs->symbols, idx, current) {
-        if (LIST_ITEM_REF(char *, current) == sym) {
-            *(prev ? &prev->next : &cs->symbols->first) = current->next;
-            free(current);
-            break;
-        }
-        prev = current;
-    }
-
-    free(sym);
-}
-
-void cs_remove_unneeded(struct calc_state *cs) {
-    struct new_name_mark *nnm = TOP_NEW_NAME(cs);
-
-    switch (nnm->type) {
-        case ITVar:
-            cs_remove_symbol(cs, get_var_name(nnm->id));
-            remove_var(nnm->id);
-            break;
-        case ITFunc:
-            cs_remove_symbol(cs, get_func_name(nnm->id));
-            remove_func(nnm->id);
-            break;
-        default:
-            /* args use persistent names;
-             * constants (incl. named) cannot be inserted,
-             * and so cannot be removed
-             */
-            break;
-    }
-
-    listRemove(cs->names, 0);
 }
 
 

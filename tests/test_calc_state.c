@@ -453,12 +453,31 @@ bool test_cs_String() {
 
     FINAL_ASSERT(res, !strcmp(cs_curr_str(cs), "g(p1,p2)=f(p2)"), t_c_Str_ret,
                  fprintf(stderr, "actual string: \"%s\"\n", cs_curr_str(cs)));
-    
+
     cs_eval(cs);
     cs_clear(cs);
 
  t_c_Str_ret:
     cs_destroy(cs);
+    return res;
+}
+
+bool test_cs_Args() {
+    struct calc_state *cs = cs_create();
+    bool res = true;
+
+    cs_interact(cs, TIIFunction);
+    cs_input_newid(cs, "af");
+    cs_interact(cs, TIILFuncall);
+    cs_interact(cs, TIIAddArg);
+    cs_interact(cs, TIIBackspace);
+    cs_interact(cs, TIIRFuncall);
+    cs_interact(cs, TIIAssign);
+    cs_interact(cs, TIINumber);
+    cs_input_number(cs, 42.0);
+    cs_eval(cs);
+    cs_clear(cs);
+
     return res;
 }
 
@@ -481,7 +500,8 @@ int main() {
         && test_cs_Expect3()
         && test_cs_Generic1()
         && test_cs_Expect4()
-        && test_cs_String();
+        && test_cs_String()
+        && test_cs_Args();
     fprintf(stderr, res ? "All ok\n" : "Some tests failed\n");
     destroy_calc();
     return !res;

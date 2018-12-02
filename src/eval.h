@@ -9,7 +9,7 @@
 
 /* TYPES (with COMPATIBILITY TYPEDEFS) */
 
-typedef double (*PredefFunc)(struct list_head *args);
+typedef double (*primitive_function)(struct list_head *args);
 
 enum token_type {
     Var, Const, Func, Number, Operator, UOperator, Arg
@@ -47,14 +47,15 @@ typedef struct token {
 
 typedef union function_body {
     struct list_head *tokens;  // list of Tokens. may contain ones with .type == Arg
-    PredefFunc f;  // function pointer. args - list of list of Token
+    primitive_function f;  // function pointer. args - list of list of Token
 } FunctionBody;
 
 typedef struct function {
     char *name;
     struct list_head *args;     // list of char* - arg names
-    bool predef;    // whether the funcs body is an list of
-                    // Tokens(false, 0) or a c-function(true, 1)
+    enum function_definedness {
+        NOT_DEFINED, PRIMITIVE, DEFINED
+    } defined_p;
     union function_body body;
 } DefinedFunction;  // callable function
 
@@ -169,7 +170,7 @@ unsigned count_func(void);
 unsigned add_func(char *name);
 unsigned set_func_args(unsigned id, struct list_head *args);
 unsigned set_func_body(unsigned id, struct list_head *body);
-unsigned set_func_func(unsigned id, PredefFunc primitive);
+unsigned set_func_func(unsigned id, primitive_function primitive);
 void remove_func(unsigned id);
 
 struct list_head *get_func_args(unsigned id);

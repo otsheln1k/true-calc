@@ -26,12 +26,6 @@ static const struct operator_props operator_props[O_Count] = {
 static struct eval_state default_eval_state = { 0 };
 
 
-/* TODOs
- * add inlines to match old interface
- * new prototypes
- */
-
-
 void init_eval_state(struct eval_state *e)
 {
     e->vars = makeList(sizeof(struct named_value));
@@ -52,7 +46,7 @@ void destroy_eval_state(struct eval_state *e)
         func = LIST_ITEM_DATA(struct function, item);
         if (func->args)
             destroyList(func->args);
-        if (!func->predef && func->body.tokens)
+        if (func->defined_p == DEFINED && func->body.tokens)
             destroyList(func->body.tokens);
     }
 
@@ -95,7 +89,7 @@ struct function *add_func_es(struct eval_state *e,
     struct function defun = {
         .name = name,
         .args = NULL,
-        .predef = true,
+        .defined_p = NOT_DEFINED,
         .body = { .f = NULL },
     };
     return (struct function *)
@@ -111,7 +105,7 @@ void remove_func_es(struct eval_state *e, unsigned int fid)
 
     if (func->args != NULL)
         destroyList(func->args);
-    if (!func->predef && func->body.tokens != NULL)
+    if (func->defined_p == DEFINED && func->body.tokens != NULL)
         destroyList(func->body.tokens);
     free(item);
 }
@@ -186,8 +180,14 @@ double call_func_es(struct eval_state *e,
                     struct list_head *argv)
 {
     struct function *func = LIST_DATA(struct function, e->funcs, fid);
-    if (func->predef)
+    switch (func->defined_p) {
+    case NOT_DEFINED:
+        return NAN;
+    case PRIMITIVE:
         return func->body.f(argv);
+    default:
+        break;
+    }
 
     struct list_head *argval = eval_all_args_es(e, argv);
     struct list_head *body = listCopy(func->body.tokens);
@@ -292,9 +292,9 @@ double eval_assignment_es(struct eval_state *e,
         /*
         struct function *f =
             LIST_DATA(struct function, e->funcs, lvalue->id);
-        if (!f->predef && f->body.tokens)
+        if (!f->defined_p == DEFINED && f->body.tokens)
             listDestroy(f->body.tokens);
-        f.predef = true;
+        f.defined_p = DEFINED;
         f->body.tokens = listCopy(rvalue);
         */
     } else {
@@ -531,22 +531,23 @@ unsigned int set_func_body(unsigned int fid, struct list_head *body)
                                    default_eval_state.funcs,
                                    fid);
 
-    if (!f->predef && f->body.tokens)
+    if (f->defined_p == DEFINED && f->body.tokens)
         destroyList(f->body.tokens);
-    f->predef = false;
+    f->defined_p = DEFINED;
     f->body.tokens = body;
     return fid;
 }
 
-unsigned int set_func_func(unsigned int fid, PredefFunc primitive)
+unsigned int set_func_func(unsigned int fid,
+                           primitive_function primitive)
 {
     struct function *f = LIST_DATA(struct function,
                                    default_eval_state.funcs,
                                    fid);
 
-    if (!f->predef && f->body.tokens)
+    if (f->defined_p == DEFINED && f->body.tokens)
         destroyList(f->body.tokens);
-    f->predef = true;
+    f->defined_p = PRIMITIVE;
     f->body.f = primitive;
     return fid;
 }

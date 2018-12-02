@@ -10,17 +10,6 @@
 /* KNOWN BUGS */
 
 /*
- * Calling an undefined (not-yet-defined) function
- * should be forbidden (or zero).
- * Set a flag: NOT_DEFINED on each not-yet-defined
- * function. Calling such function returns an error.
- *
- * When redefining a function, set that flag to
- * BEGING_REDEFINED. Keep the arg list and
- * expression list in the calc state structure
- */
-
-/*
  * We could push tokens to head; then reverse and evaluate
  * All code that will be affected is marked:
  * // EXPR LIST ACCESS
@@ -123,6 +112,9 @@ const char *cs_get_token_text(struct calc_state *cs, struct token *token) {
 
 static void cs_reset(struct calc_state *cs) {
     cs->exp = TEValue;
+    if (cs->old_func_args)
+        destroyList(cs->old_func_args);
+    cs->old_func_args = NULL;
     cs->nesting = 0;
     cs->str = malloc(CALC_STR_BLOCK_SIZE);
     cs->str[0] = 0;
@@ -187,14 +179,14 @@ void cs_set_cb(struct calc_state *cs,
 
 /* SYMBOL STORAGE */
 
-static char **cs_get_argname(struct calc_state *cs, unsigned int idx) {
+static char *cs_get_argname(struct calc_state *cs, unsigned int idx) {
     char *buf;
 
     for (; cs->argnames <= idx; cs->argnames++) {
         buf = make_prefixed_number_string("p", cs->argnames + 1);
         listInsert(cs->symbols, cs->argnames, &buf);
     }
-    return LIST_DATA(char *, cs->symbols, idx);
+    return LIST_REF(char *, cs->symbols, idx);
 }
 
 char *cs_add_symbol(struct calc_state *cs, char *sym) {
@@ -222,7 +214,7 @@ void cs_remove_symbol(struct calc_state *cs, char *sym) {
 
 void cs_remove_unneeded(struct calc_state *cs) {
     struct new_name_mark *nnm;
-    
+
     if (cs->names->length == 0
         || (nnm = TOP_NEW_NAME(cs))->offset < cs->expr->length - 1)
         return;
@@ -367,7 +359,16 @@ int cs_show_item(struct calc_state *cs, enum token_item_id tii) {
 
 /* ADD/REMOVE TOKENS */
 
+static void cs_revert_args_swap(struct calc_state *cs) {
+    /* destroyList(get_func_args(cs->first_fid)); */
+    set_func_args(cs->first_fid, cs->old_func_args);
+    cs->old_func_args = NULL;
+}
+
 void cs_add_item(struct calc_state *cs, struct token new_tok) {
+    enum subexpr_status subexpr = cs->subexpr;
+    cs->subexpr = SUBEXPR_NOT_LVALUE;
+
     if (cs->defun_p == MAY_BE_DEFUN) {
         cs->defun_idx = cs->expr->length;
         switch (cs->expr->length) {
@@ -402,8 +403,19 @@ void cs_add_item(struct calc_state *cs, struct token new_tok) {
         cs->defun_p = INSIDE_DEFUN;
     }
 
-    enum subexpr_status subexpr = cs->subexpr;
-    cs->subexpr = SUBEXPR_NOT_LVALUE;
+    if (cs->old_func_args == NULL
+        && (cs->defun_p == IS_DEFUN
+            || cs->defun_p == INSIDE_DEFUN)) {
+        cs->old_func_args = listCopy(get_func_args(cs->first_fid));
+        set_func_args(cs->first_fid, makeList(sizeof(char *)));
+    } else if (cs->old_func_args != NULL
+               && cs->defun_p == IS_NOT_DEFUN) {
+        cs_revert_args_swap(cs);
+    }
+
+    if (cs->defun_p == IS_DEFUN
+        && new_tok.type == Arg)
+        listAppend(get_func_args(TOP_FUNCALL(cs)->fid), &cs->new_arg_name);
 
     if (new_tok.type == Operator) {
         // special actions for special types of Tokens
@@ -414,9 +426,11 @@ void cs_add_item(struct calc_state *cs, struct token new_tok) {
             // EXPR LIST ACCESS
             fm.fid = GET_PTOKEN(cs->expr, cs->expr->length - 1)->value.id;
             fm.arg_idx = 0;
-            // set fid here in case of a defun
-            cs->prev_fid = fm.fid;
             listPush(cs->fcalls, &fm);
+
+            // set fid here in case of a defun
+            if (cs->defun_p == MAY_BE_DEFUN)
+                cs->first_fid = fm.fid;
         } // intentionally fall through
         case OLp:
             cs->nesting += 1;
@@ -432,19 +446,16 @@ void cs_add_item(struct calc_state *cs, struct token new_tok) {
         case ORp:
             cs->nesting -= 1;
             break;
-        case OAssign: {
-            unsigned int len = cs->expr->length;
-            // EXPR LIST ACCESS
-            struct token *prev = GET_PTOKEN(cs->expr, len - 1);
-            if (prev->type == Operator && prev->value.op == ORCall) {
-                // it's a defun
-                // prev_fid should be set already
+        case OAssign:
+            if (cs->defun_p == INSIDE_DEFUN
+                && cs->scope.offset == 0) {
+                // first_fid should be set already
+                // defun_p will be set later
                 cs->scope.nesting_level = cs->nesting;
-                cs->scope.offset = len + 1;
-                cs->scope.fid = cs->prev_fid;
+                cs->scope.offset = cs->expr->length + 1;
+                cs->scope.fid = cs->first_fid;
             }
             break;
-        }
         default:
             break;
         }
@@ -513,6 +524,10 @@ void cs_rem_item(struct calc_state *cs) {
     default:
         break;
     }
+
+    if (cs->defun_p == MAY_BE_DEFUN
+        && cs->old_func_args != NULL)
+        cs_revert_args_swap(cs);
 
     switch (t->type) {
     case Operator:
@@ -681,16 +696,9 @@ unsigned int cs_input_newid(struct calc_state *cs, char *name) {
 }
 
 void cs_input_newarg(struct calc_state *cs) {
-    struct funcall_mark *fm;
+    struct funcall_mark *fm = TOP_FUNCALL(cs);
 
-    /*
-     * why do we use funcall stack for
-     * the currently defined function?
-     */
-
-    fm = TOP_FUNCALL(cs);
-    listAppend(get_func_args(fm->fid),
-               cs_get_argname(cs, fm->arg_idx));
+    cs->new_arg_name = cs_get_argname(cs, fm->arg_idx);
     cs_input_id(cs, fm->arg_idx);
 }
 

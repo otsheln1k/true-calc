@@ -70,12 +70,13 @@ struct calc_state {
     size_t str_len;
     calc_state_changed_cb callback;
     calc_eval_cb eval_cb;
-    // temporarily disable the callback
-    // TODO: should the eval_cb be disabled as well?
+    // if 1, temporarily disables the callback
     int no_cb;
     // funcall_mark list
     struct list_head *fcalls;
-    unsigned int prev_fid;
+    unsigned int first_fid;
+    char *new_arg_name;
+    struct list_head *old_func_args;
     size_t defun_idx;
     enum defun_status {
         MAY_BE_DEFUN, IS_NOT_DEFUN, IS_DEFUN, INSIDE_DEFUN,

@@ -1,13 +1,18 @@
 #include "test_ut.h"
 #include "eval.h"
+#include "compat_eval.h"
 #include "ftoa.h"
 #include "calc_state.h"
 
+PREDEF_ONELINE_FUNC(test_func_oneplus, args, argv,
+    (GET_DOUBLE(argv, 0) + GET_DOUBLE(argv, 1) + 1.));
+
 /* GLOBAL */
-unsigned int fid;
+extern struct eval_state *default_eval_state;
 
 bool test_cs_1() {
     struct calc_state *cs = cs_create();
+    default_eval_state = &cs->e;
     cs_add_item(cs, (Token){ Number, 15 });
     cs_add_item(cs, (Token){ Operator, { .op = OAdd } });
     cs_add_item(cs, (Token){ Number, 27 });
@@ -26,6 +31,7 @@ test_failed:
 
 bool test_cs_2() {
     struct calc_state *cs = cs_create();
+    default_eval_state = &cs->e;
     unsigned int fid0 = set_func_body(set_func_args(add_func("f1"), LIST_CONV(char *, 1, { "p0" })), LIST_CONV(Token, 3, ARG({ { Arg, { .id = 0 } }, { Operator, { .op = OAdd } }, { Number, 10 } })));
     cs_add_item(cs, (Token){ Func, { .id = fid0 } });
     cs_add_item(cs, (Token){ Operator, { .op = OLCall } });
@@ -39,6 +45,7 @@ bool test_cs_2() {
 
 bool test_cs_3() {
     struct calc_state *cs = cs_create();
+    default_eval_state = &cs->e;
     unsigned int vid = add_var(21., "var_0");
     unsigned int cid = add_const(2., "cst_0");
     cs_add_item(cs, (Token){ Var, { .id = vid } });
@@ -77,6 +84,7 @@ bool test_cs_ftoa() {
 
 bool test_cs_Interact() {
     struct calc_state *cs = cs_create();
+    default_eval_state = &cs->e;
     unsigned int varid = add_var(15., "var_1");
     cs_interact(cs, TIINumber);
     cs_input_number(cs, 27.);
@@ -92,10 +100,12 @@ bool test_cs_Interact() {
 
 bool test_cs_InteractiveVar() {
     struct calc_state *cs = cs_create();
+    default_eval_state = &cs->e;
     cs_interact(cs, TIIVar);
     char *n = malloc(4);
     strcpy(n, "v_2");
     unsigned int vid = cs_input_newid(cs, n);
+    free(n);
     cs_interact(cs, TIIAssign);
     cs_interact(cs, TIINumber);
     cs_input_number(cs, 21.);
@@ -113,6 +123,7 @@ bool test_cs_InteractiveVar() {
 
 bool test_cs_Nesting() {
     struct calc_state *cs = cs_create();
+    default_eval_state = &cs->e;
     cs_interact(cs, TIILParen);
     if (!ASSERT(cs->nesting == 1)) { bool res = false; goto t_c_N_ret; }
     cs_interact(cs, TIINumber);
@@ -136,6 +147,10 @@ t_c_N_ret:
 
 bool test_cs_Stack() {
     struct calc_state *cs = cs_create();
+    default_eval_state = &cs->e;
+    unsigned fid = set_func_func(set_func_args(add_func("tf1+"),
+                                               LIST_CONV(char *, 2, ARG({ "x", "y" }))),
+                                 test_func_oneplus);
     cs_interact(cs, TIIFunction);
     cs_input_id(cs, fid);
     cs_interact(cs, TIILFuncall);
@@ -164,6 +179,7 @@ t_c_S_ret:
 
 bool test_cs_Scope() {
     struct calc_state *cs = cs_create();
+    default_eval_state = &cs->e;
     cs_interact(cs, TIIFunction);
     unsigned int fid1 = add_func("newf");
     cs_input_id(cs, fid1);          // check cs_input_newid
@@ -194,14 +210,15 @@ t_c_Sc_ret:
     return res;
 }
 
-PREDEF_ONELINE_FUNC(test_func_oneplus, args, argv,
-    (GET_DOUBLE(argv, 0) + GET_DOUBLE(argv, 1) + 1.));
-
 #define FINAL_ASSERT(var, expr, mark, ...) { var &= ASSERT(expr); if (!var) { __VA_ARGS__ ; goto mark; } }
 
 bool test_cs_Expect1() {
     struct calc_state *cs = cs_create();
+    default_eval_state = &cs->e;
     bool res = true;
+    unsigned fid = set_func_func(set_func_args(add_func("tf1+"),
+                                               LIST_CONV(char *, 2, ARG({ "x", "y" }))),
+                                 test_func_oneplus);
     cs_interact(cs, TIINumber);
     cs_input_number(cs, 126);
     FINAL_ASSERT(res, cs->exp == TEBinaryOperator, t_c_E_ret);
@@ -237,6 +254,7 @@ t_c_E_ret:
 
 int test_cs_Expect2() {
     struct calc_state *cs = cs_create();
+    default_eval_state = &cs->e;
     bool res = true;
     unsigned int varid1 = add_var(2., "var_1");
     cs_interact(cs, TIILParen);
@@ -267,6 +285,7 @@ t_c_E2_ret:
 
 int test_cs_Expect3() {
     struct calc_state *cs = cs_create();
+    default_eval_state = &cs->e;
     bool res = true;
     unsigned int fid0 = add_func("f1");
     unsigned int varid = add_var(0, "var_2");
@@ -327,6 +346,7 @@ t_c_E3_ret:
 
 int test_cs_Generic1() {
     struct calc_state *cs = cs_create();
+    default_eval_state = &cs->e;
     bool res = true;
 
     cs_interact(cs, TIINumber);
@@ -341,7 +361,12 @@ int test_cs_Generic1() {
     cs_interact(cs, TIINumber);
     cs_input_number(cs, 3.0);
     cs_interact(cs, TIISaveToConst);
-    res &= ASSERT(get_const(count_const() - 1) == 5.0);
+
+    // previously, consts were appended to
+    // the list; now they’re inserted in
+    // front of the list.
+    res &= ASSERT(get_const(0) == 5.0);
+    /* res &= ASSERT(get_const(count_const() - 1) == 5.0); */
 
     cs_destroy(cs);
     return res;
@@ -349,6 +374,7 @@ int test_cs_Generic1() {
 
 int test_cs_Expect4() {
     struct calc_state *cs = cs_create();
+    default_eval_state = &cs->e;
     bool res = true;
 
     struct {
@@ -422,6 +448,7 @@ int test_cs_Expect4() {
 
 bool test_cs_String() {
     struct calc_state *cs = cs_create();
+    default_eval_state = &cs->e;
     bool res = true;
 
     cs_interact(cs, TIIFunction);
@@ -464,6 +491,7 @@ bool test_cs_String() {
 
 bool test_cs_Args() {
     struct calc_state *cs = cs_create();
+    default_eval_state = &cs->e;
     bool res = true;
 
     cs_interact(cs, TIIFunction);
@@ -482,11 +510,7 @@ bool test_cs_Args() {
 }
 
 int main() {
-    init_calc();
-    fid = set_func_func(set_func_args(add_func("tf1+"),
-                                      LIST_CONV(char *, 2, ARG({ "x", "y" }))),
-                        test_func_oneplus);
-    bool res = test_cs_1()
+   bool res = test_cs_1()
         && test_cs_ftoa()
         && test_cs_2()
         && test_cs_3()
@@ -503,6 +527,5 @@ int main() {
         && test_cs_String()
         && test_cs_Args();
     fprintf(stderr, res ? "All ok\n" : "Some tests failed\n");
-    destroy_calc();
     return !res;
 }

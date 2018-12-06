@@ -6,10 +6,17 @@
 #include <stdbool.h>
 #include "list.h"
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 
 /* TYPES (with COMPATIBILITY TYPEDEFS) */
 
-typedef double (*primitive_function)(struct list_head *args);
+struct eval_state;
+
+typedef double (*primitive_function)(struct eval_state *e,
+                                     struct list_head *args);
 
 enum token_type {
     Var, Const, Func, Number, Operator, UOperator, Arg
@@ -82,10 +89,10 @@ void init_eval_state(struct eval_state *e);
 void destroy_eval_state(struct eval_state *e);
 
 double eval_atom_es(struct eval_state *e, struct token *atom);
-struct number_value *add_number_value_es(struct list_head *l,
-                                         double init_val,
-                                         char *name,
-                                         int head_p);
+struct named_value *add_named_value_es(struct list_head *l,
+                                       double init_val,
+                                       char *name,
+                                       int head_p);
 struct function *add_func_es(struct eval_state *e,
                              char *name,
                              int head_p);
@@ -116,73 +123,37 @@ double eval_binary_es(struct eval_state *e,
 double eval_expr_es(struct eval_state *e,
                     struct list_head *tokens);
 
+#define GET_VAR(e, idx) LIST_DATA(struct named_value, (e)->vars, (idx))
+#define GET_CONST(e, idx) LIST_DATA(struct named_value, (e)->consts, (idx))
+#define GET_FUNC(e, idx) LIST_DATA(struct function, (e)->funcs, (idx))
+#define FUNC_ARG_PTR(f, idx) LIST_DATA(char *, (f)->args, (idx))
 
-/* OLD INTERFACE */
+#define FUNCDEF(e, fname, fargs, fpredef)               \
+    do {                                                \
+        struct function *f = add_func_es(e, fname, 0);  \
+        f->args = fargs;                                \
+        f->defined_p = PRIMITIVE;                       \
+        f->body.f = fpredef;                            \
+    } while (0);
 
-// MACROS
+#define FUNCDEF_ARGS(e, fname, fargc, fargs, fpredef)           \
+    FUNCDEF(e, fname, LIST_CONV(char *, fargc, fargs), fpredef)
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
-
-#define GET_TOKEN(arr,idx) LIST_REF(Token, arr, idx)
-
-#define GET_PTOKEN(arr,idx) LIST_DATA(Token, arr, idx)
-
-#define GET_DOUBLE(arr, idx) LIST_REF(double, arr, idx)
-
-#define PREDEF_ONELINE_FUNC(name, args_name, argv_name, expr) \
-    static double name(struct list_head *args_name) { \
-        struct list_head *argv_name = eval_all_args(args_name); \
-        double res = expr; \
-        destroyList(argv_name); \
-        return res; \
+#define PREDEF_ONELINE_FUNC(name, args_name, argv_name, expr)   \
+    static double name(struct eval_state *e,                    \
+                       struct list_head *args_name) {           \
+        struct list_head *argv_name =                           \
+            eval_all_args_es(e, args_name);                     \
+        double res = expr;                                      \
+        destroyList(argv_name);                                 \
+        return res;                                             \
     }
 
-#define FUNCDEF(fname, fargs, fpredef) \
-        set_func_func(set_func_args(add_func(fname), fargs), fpredef)
 
-#define FUNCDEF_ARGS(fname, fargc, fargs, fpredef) \
-        FUNCDEF(fname, LIST_CONV(char *, fargc, fargs), fpredef)
+/* OLD MACROS */
 
-// FUNCTIONS
-
-void init_calc(void);
-void destroy_calc(void);
-
-double eval_atom(struct token t);
-
-unsigned count_var(void);
-unsigned add_var(double val, char *name);
-double get_var(unsigned id);
-char *get_var_name(unsigned id);
-void set_var(unsigned id, double val);
-void remove_var(unsigned id);
-
-unsigned count_const(void);
-unsigned add_const(double val, char *name);
-double get_const(unsigned id);
-char *get_const_name(unsigned id);
-void set_const(unsigned id, double val);
-void remove_const(unsigned id);
-
-unsigned count_func(void);
-unsigned add_func(char *name);
-unsigned set_func_args(unsigned id, struct list_head *args);
-unsigned set_func_body(unsigned id, struct list_head *body);
-unsigned set_func_func(unsigned id, primitive_function primitive);
-void remove_func(unsigned id);
-
-struct list_head *get_func_args(unsigned id);
-unsigned get_func_argc(unsigned id);
-char *get_func_arg_name(unsigned id, unsigned arg);
-char *get_func_name(unsigned id);
-
-struct list_head *eval_all_args(struct list_head *args);
-double call_func(unsigned fid, struct list_head *args);
-struct lvalue eval_lvalue(struct list_head *tokens);
-struct lvalue eval_assign(struct lvalue lvalue,
-                          struct list_head *tokens);
-double eval_expr(struct list_head *tokens, int op_order);
+#define GET_TOKEN(arr,idx) LIST_REF(Token, arr, idx)
+#define GET_PTOKEN(arr,idx) LIST_DATA(Token, arr, idx)
+#define GET_DOUBLE(arr, idx) LIST_REF(double, arr, idx)
 
 #endif

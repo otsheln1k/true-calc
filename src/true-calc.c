@@ -34,7 +34,8 @@ void mlc_config(void *ctx);
 
 /* ---===CONST-SAVE-LOAD===--- */
 
-void save_const(unsigned int cid) {
+void save_const(struct eval_state *e,
+                unsigned int cid) {
     int32_t idx = 0;
     if (!persist_exists(0))
         persist_write_int(0, 1);
@@ -42,14 +43,15 @@ void save_const(unsigned int cid) {
         idx = persist_read_int(0);
         persist_write_int(0, ++idx);
     }
-    double val = get_const(cid);
+    struct named_value *cst = GET_CONST(e, cid);
+    double val = cst->value;
     persist_write_data(2 * idx - 1, &val, sizeof(double));
     char buf[SAVED_CONST_NAME_LEN_MAX];
-    strncpy(buf, get_const_name(cid), sizeof(buf));
+    strncpy(buf, cst->name, sizeof(buf));
     persist_write_string(2 * idx, buf);
 }
 
-unsigned int load_const() {
+unsigned int load_const(struct eval_state *e) {
     if (!persist_exists(0))
         return 0;
     int32_t c = persist_read_int(0);
@@ -79,29 +81,32 @@ void clear_const() {
     persist_write_int(0, 0);
 }
 
-static double predef_savec(struct list_head *args) {
+static double predef_savec(struct eval_state *e,
+                           struct list_head *args) {
     if (!args->length)
         return -1.;
     Token *tokp = GET_PTOKEN(LIST_REF(struct list_head *, args, 0), 0);
     if (tokp->type != Const)
         return -1.;
-    save_const(tokp->value.id);
+    save_const(e, tokp->value.id);
     return 0;
 }
 
-static double predef_loadc(struct list_head *args) {
-    return (double)load_const();
+static double predef_loadc(struct eval_state *e,
+                           struct list_head *args) {
+    return (double)load_const(e);
 }
 
-static double predef_clearc(struct list_head *args) {
+static double predef_clearc(struct eval_state *e,
+                            struct list_head *args) {
     clear_const();
     return 0;
 }
 
-void init_constlib() {
-    FUNCDEF_ARGS("save_cst", 1, { "cst" }, predef_savec);
-    FUNCDEF("load_cst", makeList(sizeof(char *)), predef_loadc);
-    FUNCDEF("clear_cst", makeList(sizeof(char *)), predef_clearc);
+void init_constlib(struct eval_state *e) {
+    FUNCDEF_ARGS(e, "save_cst", 1, { "cst" }, predef_savec);
+    FUNCDEF(e, "load_cst", makeList(sizeof(char *)), predef_loadc);
+    FUNCDEF(e, "clear_cst", makeList(sizeof(char *)), predef_clearc);
 }
 
 /* ---===VARIOUS-FUNCS===--- */
@@ -264,13 +269,14 @@ void nlc_back(NumberLayer *nl, void *ctx) {
 uint16_t ml_get_num_rows(MenuLayer *ml, uint16_t idx, void *ctx) {
     switch (cs_get_input_type(calc_state)) {
     case ITVar:
-        return count_var() + 1;
+        return calc_state->e.vars->length + 1;
     case ITConst:
-        return count_const();
+        // we don’t need an additional row for ‘add’ button
+        return calc_state->e.consts->length;
     case ITFunc:
-        return count_func() + 1;
+        return calc_state->e.funcs->length + 1;
     case ITArg:
-        return get_func_argc(cs_get_func_id(calc_state));
+        return GET_FUNC(&calc_state->e, cs_get_func_id(calc_state))->args->length;
     default:
         /* never reached */
         return 0;
@@ -283,16 +289,17 @@ void ml_draw_row(GContext *gctx, const Layer *cell_layer, MenuIndex *cell_index,
 
     switch (cs_get_input_type(calc_state)) {
     case ITVar:
-        name = row ? get_var_name(row - 1) : "+";
+        name = row ? GET_VAR(&calc_state->e, row - 1)->name : "+";
         break;
     case ITFunc:
-        name = row ? get_func_name(row - 1) : "+";
+        name = row ? GET_FUNC(&calc_state->e, row - 1)->name : "+";
         break;
     case ITConst:
-        name = get_const_name(row);
+        name = GET_CONST(&calc_state->e, row)->name;
         break;
     case ITArg:
-        name = get_func_arg_name(cs_get_func_id(calc_state), row);
+        name = *FUNC_ARG_PTR(GET_FUNC(&calc_state->e, cs_get_func_id(calc_state)),
+                             row);
         break;
     default:
         /* never reached */
@@ -344,11 +351,11 @@ void mlc_config(void *ctx) {  // CLICK-CONFIG
 
 void mw_load(Window *wnd) {
     calc_state = cs_create();
+    /* default_eval_state = &calc_state->e; */
     cs_set_cb(calc_state, cs_callback, cs_eval_cb);
 
-    init_calc();  // initializes the data lists
-    cl_lib_init();
-    init_constlib();
+    cl_lib_init(&calc_state->e);
+    init_constlib(&calc_state->e);
 
     Layer *root_layer = window_get_root_layer(wnd);
     GSize size = layer_get_bounds(root_layer).size;
@@ -394,7 +401,6 @@ void mw_unload(Window *wnd) {
     menu_layer_destroy(menu_l);
     number_layer_destroy(number_l);
     cs_destroy(calc_state);
-    destroy_calc();
 }
 
 void init_app() {

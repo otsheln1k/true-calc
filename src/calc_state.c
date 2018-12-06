@@ -15,6 +15,13 @@
  * // EXPR LIST ACCESS
  */
 
+/*
+ * The eval context should be kept inside
+ * the calc state.
+ * See:
+ * // EVAL
+ */
+
 
 /* NOT-YET-KNOWN BUGS */
 
@@ -74,11 +81,11 @@ const char *cs_get_token_text(struct calc_state *cs, struct token *token) {
 
     switch (token->type) {
     case Var:
-        return get_var_name(token->value.id);
+        return GET_VAR(&cs->e, token->value.id)->name;
     case Const:
-        return get_const_name(token->value.id);
+        return GET_CONST(&cs->e, token->value.id)->name;
     case Func:
-        return get_func_name(token->value.id);
+        return GET_FUNC(&cs->e, token->value.id)->name;
     case Number:
         ftoa(token->value.number, buffer, sizeof(buffer));
         return buffer;
@@ -99,10 +106,12 @@ const char *cs_get_token_text(struct calc_state *cs, struct token *token) {
         else
             return "-";
     case Arg:
-        return get_func_arg_name(
-            (cs->defun_p == INSIDE_DEFUN)
-            ? cs->scope.fid
-            : TOP_FUNCALL(cs)->fid,
+        return *FUNC_ARG_PTR(
+            GET_FUNC(
+                &cs->e,
+                (cs->defun_p == INSIDE_DEFUN)
+                ? cs->scope.fid
+                : TOP_FUNCALL(cs)->fid),
             token->value.id);
     default:
         return "error";
@@ -112,9 +121,10 @@ const char *cs_get_token_text(struct calc_state *cs, struct token *token) {
 
 static void cs_reset(struct calc_state *cs) {
     cs->exp = TEValue;
-    if (cs->old_func_args)
+    if (cs->func_args_swapped
+        && cs->old_func_args)
         destroyList(cs->old_func_args);
-    cs->old_func_args = NULL;
+    cs->func_args_swapped = 0;
     cs->nesting = 0;
     cs->str = malloc(CALC_STR_BLOCK_SIZE);
     cs->str[0] = 0;
@@ -127,6 +137,7 @@ static void cs_reset(struct calc_state *cs) {
 
 struct calc_state *cs_create() {
     struct calc_state *cs = malloc(sizeof(*cs));
+    init_eval_state(&cs->e);
     cs->expr = makeList(sizeof(struct token));
     cs->callback = NULL;
     cs->eval_cb = NULL;
@@ -144,7 +155,7 @@ double cs_eval(struct calc_state *cs) {
     listClear(cs->names);
     // EXPR LIST ACCESS
     // just reverse the list
-    double res = eval_expr(cs_get_expr(cs), 0);
+    double res = eval_expr_es(&cs->e, cs_get_expr(cs));
     if (cs->eval_cb != NULL)
         cs->eval_cb(cs, res);
     return res;
@@ -166,6 +177,7 @@ void cs_destroy(struct calc_state *cs) {
     FOR_LIST_COUNTER(cs->symbols, index, char *, sym)
         free(*sym);
     destroyList(cs->symbols);
+    destroy_eval_state(&cs->e);
     free(cs);
 }
 
@@ -221,12 +233,12 @@ void cs_remove_unneeded(struct calc_state *cs) {
 
     switch (nnm->type) {
         case ITVar:
-            cs_remove_symbol(cs, get_var_name(nnm->id));
-            remove_var(nnm->id);
+            cs_remove_symbol(cs, GET_VAR(&cs->e, nnm->id)->name);
+            listRemove(cs->e.vars, nnm->id);
             break;
         case ITFunc:
-            cs_remove_symbol(cs, get_func_name(nnm->id));
-            remove_func(nnm->id);
+            cs_remove_symbol(cs, GET_FUNC(&cs->e, nnm->id)->name);
+            remove_func_es(&cs->e, nnm->id);
             break;
         default:
             /* args use persistent names;
@@ -333,7 +345,7 @@ int cs_show_item(struct calc_state *cs, enum token_item_id tii) {
         case TIIFunction: case TIIUPlus: case TIIUMinus:
             return (cs->exp & TEValue) == TEValue;
         case TIIConst:
-            return (cs->exp & TEValue) && (count_const());
+            return (cs->exp & TEValue) && cs->e.consts->length;
         case TIIRParen:
             return (cs->exp & TECloseParen) == TECloseParen;
         case TIIAssign:
@@ -359,10 +371,18 @@ int cs_show_item(struct calc_state *cs, enum token_item_id tii) {
 
 /* ADD/REMOVE TOKENS */
 
-static void cs_revert_args_swap(struct calc_state *cs) {
-    /* destroyList(get_func_args(cs->first_fid)); */
-    set_func_args(cs->first_fid, cs->old_func_args);
-    cs->old_func_args = NULL;
+static void cs_swap_args(struct calc_state *cs) {
+    struct function *f = GET_FUNC(&cs->e, cs->first_fid);
+    cs->func_args_swapped = 1;
+    cs->old_func_args = f->args;
+    f->args = makeList(sizeof(char *));
+}
+
+static void cs_revert_swap_args(struct calc_state *cs) {
+    struct function *f = GET_FUNC(&cs->e, cs->first_fid);
+    destroyList(f->args);
+    f->args = cs->old_func_args;
+    cs->func_args_swapped = 0;
 }
 
 void cs_add_item(struct calc_state *cs, struct token new_tok) {
@@ -403,19 +423,19 @@ void cs_add_item(struct calc_state *cs, struct token new_tok) {
         cs->defun_p = INSIDE_DEFUN;
     }
 
-    if (cs->old_func_args == NULL
+    if (!cs->func_args_swapped
         && (cs->defun_p == IS_DEFUN
             || cs->defun_p == INSIDE_DEFUN)) {
-        cs->old_func_args = listCopy(get_func_args(cs->first_fid));
-        set_func_args(cs->first_fid, makeList(sizeof(char *)));
-    } else if (cs->old_func_args != NULL
+        cs_swap_args(cs);
+    } else if (cs->func_args_swapped
                && cs->defun_p == IS_NOT_DEFUN) {
-        cs_revert_args_swap(cs);
+        cs_revert_swap_args(cs);
     }
 
     if (cs->defun_p == IS_DEFUN
         && new_tok.type == Arg)
-        listAppend(get_func_args(TOP_FUNCALL(cs)->fid), &cs->new_arg_name);
+        listAppend(GET_FUNC(&cs->e, TOP_FUNCALL(cs)->fid)->args,
+                   &cs->new_arg_name);
 
     if (new_tok.type == Operator) {
         // special actions for special types of Tokens
@@ -525,10 +545,6 @@ void cs_rem_item(struct calc_state *cs) {
         break;
     }
 
-    if (cs->defun_p == MAY_BE_DEFUN
-        && cs->old_func_args != NULL)
-        cs_revert_args_swap(cs);
-
     switch (t->type) {
     case Operator:
         switch (t->value.op) {
@@ -571,7 +587,8 @@ void cs_rem_item(struct calc_state *cs) {
         break;
     case Arg:
         if (cs->defun_p != INSIDE_DEFUN) {
-            struct list_head *fargs = get_func_args(TOP_FUNCALL(cs)->fid);
+            struct list_head *fargs =
+                GET_FUNC(&cs->e, TOP_FUNCALL(cs)->fid)->args;
             listRemove(fargs, fargs->length - 1);
         }
         break;
@@ -590,6 +607,11 @@ void cs_rem_item(struct calc_state *cs) {
         /* cs_remove_unneeded(cs); */
     /* } */
     }
+
+    if (cs->defun_p == MAY_BE_DEFUN
+        && cs->func_args_swapped)
+        cs_revert_swap_args(cs);
+
     cs->str_len -= slen;
     cs->str[cs->str_len - 1] = 0;
     // EXPR LIST ACCESS
@@ -677,10 +699,17 @@ unsigned int cs_input_newid(struct calc_state *cs, char *name) {
 
     switch (cs->cit) {
     case ITVar:
-        id = add_var(0, cs_add_symbol(cs, name));
+        add_named_value_es(cs->e.vars,
+                           0.0,
+                           cs_add_symbol(cs, name),
+                           0);
+        id = cs->e.vars->length - 1;
         break;
     case ITFunc:
-        id = add_func(cs_add_symbol(cs, name));
+        add_func_es(&cs->e,
+                    cs_add_symbol(cs, name),
+                    0);
+        id = cs->e.funcs->length - 1;
         break;
     case ITNC:
         return cs_add_const(cs, cs_eval(cs), name);
@@ -708,7 +737,11 @@ void cs_input_newarg(struct calc_state *cs) {
 unsigned int cs_add_const(struct calc_state *cs,
                           double val,
                           char *name) {
-    return add_const(val, cs_add_symbol(cs, name));
+    add_named_value_es(cs->e.consts,
+                       val,
+                       cs_add_symbol(cs, name),
+                       1);
+    return 0;
 }
 
 

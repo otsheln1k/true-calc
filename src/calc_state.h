@@ -57,6 +57,8 @@ struct defun_mark {
 
 // new-style definition
 struct calc_state {
+    // our very own eval state
+    struct eval_state e;
     // token list
     struct list_head *expr;
     // expectations
@@ -76,6 +78,7 @@ struct calc_state {
     struct list_head *fcalls;
     unsigned int first_fid;
     char *new_arg_name;
+    int func_args_swapped;
     struct list_head *old_func_args;
     size_t defun_idx;
     enum defun_status {

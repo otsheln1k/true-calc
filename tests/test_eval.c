@@ -1,6 +1,7 @@
 #include "test_ut.h"
 #include "ieee_fp.h"
 #include "eval.h"
+#include "compat_eval.h"
 
 // TODO check eval.c
 // TODO predefined symbols
@@ -148,6 +149,9 @@ bool test_eval_zeroArglist() {
 }
 
 int main() {
+    struct eval_state es;
+    default_eval_state = &es;
+    init_eval_state(default_eval_state);
     init_calc();
     bool res =
         test_eval_vars()

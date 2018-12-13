@@ -150,9 +150,6 @@ double eval_expr_es(struct eval_state *e,
     }
 
 
-/* OLD MACROS */
-
-#define GET_TOKEN(arr,idx) LIST_REF(Token, arr, idx)
 #define GET_PTOKEN(arr,idx) LIST_DATA(Token, arr, idx)
 #define GET_DOUBLE(arr, idx) LIST_REF(double, arr, idx)
 

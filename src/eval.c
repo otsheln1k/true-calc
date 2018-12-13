@@ -257,7 +257,7 @@ bool eval_lvalue_es(struct list_head *tokens, struct lvalue *ret_lvalue)
             return false;
     }
 
-    ret_lvalue->id = GET_TOKEN(tokens, 0).value.id;
+    ret_lvalue->id = GET_PTOKEN(tokens, 0)->value.id;
     ret_lvalue->is_func = is_func;
     return true;
 }

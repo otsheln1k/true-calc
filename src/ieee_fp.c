@@ -1,10 +1,13 @@
 #include "ieee_fp.h"
+#include <math.h>
 
 #ifdef __PEBBLE__
 #ifndef __SMALL_BITFIELDS
 #define __SMALL_BITFIELDS
 #endif
 #include <ieeefp.h>
+#define BIAS 1023
+#define EXPONENT_MAX 2047
 
 double ieee_copysign(double x, double y)
 {
@@ -20,7 +23,7 @@ double ieee_trunc(double x)
     __ieee_double_shape_type shape;
     shape.value = x;
 
-    int exp = shape.number.exponent - 1023;
+    int exp = shape.number.exponent - BIAS;
 
     // no bits in integral part
     if (exp < 0)
@@ -52,8 +55,28 @@ double ieee_trunc(double x)
  clear_0: return shape.value;
 }
 
+int ieee_fpclassify(double x)
+{
+    __ieee_double_shape_type shape;
+    shape.value = x;
+    int max_exp = (shape.number.exponent == EXPONENT_MAX);
+    int zbe = (shape.number.exponent == 0);
+    int zs = (shape.number.fraction0 == 0
+              && shape.number.fraction1 == 0
+              && shape.number.fraction2 == 0
+              && shape.number.fraction3 == 0);
+
+    if (zbe)
+        return zs ? FP_ZERO : FP_SUBNORMAL;
+    if (max_exp)
+        return zs ? FP_INFINITE : FP_NAN;
+    return FP_NORMAL;
+}
+
 #else
 #include <ieee754.h>
+#define BIAS 1023
+#define EXPONENT_MAX 2047
 
 double ieee_copysign(double x, double y)
 {
@@ -70,13 +93,13 @@ double ieee_trunc(double x)
     d.d = x;
 
     unsigned int exp = d.ieee.exponent;
-    if (exp < 1023)
+    if (exp < BIAS)
         return ieee_copysign(0.0, x);
 
-    if (exp >= 1023 + 53)
+    if (exp >= BIAS + 53)
         return x;
 
-    int exp_s = exp - 1023;
+    int exp_s = exp - BIAS;
 
     // mantissa0:20
     // mantissa1:32
@@ -88,6 +111,22 @@ double ieee_trunc(double x)
     }
 
     return d.d;
+}
+
+int ieee_fpclassify(double x)
+{
+    union ieee754_double dx;
+    dx.d = x;
+    int max_exp = (dx.ieee.exponent == EXPONENT_MAX);
+    int zbe = (dx.ieee.exponent == 0);
+    int zs = (dx.ieee.mantissa0 == 0
+              && dx.ieee.mantissa1 == 0);
+
+    if (zbe)
+        return zs ? FP_ZERO : FP_SUBNORMAL;
+    if (max_exp)
+        return zs ? FP_INFINITE : FP_NAN;
+    return FP_NORMAL;
 }
 
 #endif

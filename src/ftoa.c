@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 
 #include "ieee_fp.h"
 #include "ftoa.h"
@@ -37,6 +38,21 @@ static int get_digit(double *d_rw, double p10,
     return (int)head;
 }
 
+static void write_nan(double d, char *buf, size_t num)
+{
+    strncpy(buf, "NaN", num);
+}
+
+static void write_inf(int sign, char *buf, size_t num)
+{
+    if (num <= 4 && sign > 0) {
+        strncpy(buf, "inf", num);
+    } else {
+        buf[0] = (sign > 0) ? '+' : '-';
+        strncpy(&buf[1], "inf", num - 1);
+    }
+}
+
 void ftoa(double d, char *buf, size_t num)
 {
     // we may want to write d in scientific notation:
@@ -57,6 +73,15 @@ void ftoa(double d, char *buf, size_t num)
     char *pos = buf;
 
     if (num < 2) return;
+
+    switch (ieee_fpclassify(d)) {
+    case FP_NAN:
+        return write_nan(d, buf, num);
+    case FP_INFINITE:
+        return write_inf((d > 0) ? 1 : -1, buf, num);
+    default:
+        break;
+    }
 
     if (FP_EQ(d, 0.0)) {
         buf[0] = '0';

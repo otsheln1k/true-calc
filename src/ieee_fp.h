@@ -13,4 +13,6 @@ double ieee_trunc(double x);
 double ieee_fabs(double x);
 double ieee_fmod(double x, double y);
 
+int ieee_fpclassify(double x);
+
 #endif

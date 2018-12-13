@@ -1,3 +1,5 @@
+#include <math.h>
+
 #include "test_ut.h"
 #include "ieee_fp.h"
 #include "eval.h"
@@ -135,7 +137,12 @@ bool test_eval_ieeeFp() {
         && ASSERT(ieee_fabs(0.5) == 0.5)
         && ASSERT(ieee_fabs(-12365312) == 12365312)
         && ASSERT(FP_EQ(ieee_fmod(11.5, 3.2), 1.9))
-        && ASSERT(FP_EQ(ieee_fmod(0.03, 0.01), 0.0));
+        && ASSERT(FP_EQ(ieee_fmod(0.03, 0.01), 0.0))
+        && ASSERT(ieee_fpclassify(12.3) == FP_NORMAL)
+        && ASSERT(ieee_fpclassify(0.0) == FP_ZERO)
+        && ASSERT(ieee_fpclassify(INFINITY) == ieee_fpclassify(-INFINITY))
+        && ASSERT(ieee_fpclassify(INFINITY) == FP_INFINITE)
+        && ASSERT(ieee_fpclassify(nan("error")) == FP_NAN);
 }
 
 bool test_eval_zeroArglist() {

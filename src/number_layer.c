@@ -206,54 +206,61 @@ void number_layer_finish(NumberLayer *nl) {
     layer_mark_dirty(nl->l);
 }
 
-void number_layer_select(NumberLayer *nl, bool up) {
-    /*  ordering:
-     * <...>
-     * One
-     * Zero
-     * DONE
-     * point (bottom)
-     * <base> - 1 (top)
-     * <...>
-     */
-    bool s_done = nlShowDone(nl);
-    bool s_point = nlShowDecimalPoint(nl);
-    bool s_unsc = nlShowUnderscore(nl);
-    bool s_digs = nlShowDigits(nl);
-    char base = nl->base;
-    NumberLayerItem max = (nl->identifier) ? NLZ : (NLZero + base - 1);
-    NumberLayerItem cur = nl->current;
-    if ((cur == NLZero || (cur == NLA && !s_digs)) && !up) {
-        if (cur == NLA)
-            nl->current = NLZero;
-        if (s_done || s_point || s_unsc)
-            nl->current -= 1 + !s_done + !(s_done || s_unsc);
-        else
-            nl->current = max;
-    } else if (cur == max && up) {  // check done & point, if none, cycle
-        if (s_done || s_point || s_unsc)
-            nl->current = NLPoint + !s_point + !(s_unsc || s_point);
-        else
-            nl->current = s_digs ? NLZero : NLA;
-    } else if (cur == NLPoint) {  // see max
-        if (up)
-            nl->current += 1 + !s_unsc + !(s_done || s_unsc);
-        else
-            nl->current = max;
-    } else if (cur == NLDone && !up) {
-        if (s_point || s_unsc)
-            nl->current -= 1 + !s_unsc;
-        else
-            nl->current = max;
-    } else if (up) {
-        nl->current += 1;
-    } else {
-        nl->current -= 1;
+static NumberLayerItem nlGetMax(NumberLayer *nl) {
+    return (nl->identifier) ? NLZ : (NLZero + nl->base - 1);
+}
+
+static NumberLayerItem nlIncrement(NumberLayer *nl, NumberLayerItem nli) {
+    switch (nli) {
+    case NLMinus:
+        if (nlShowDecimalPoint(nl)) return NLPoint;
+        // else fall through
+    case NLPoint:
+        if (nlShowUnderscore(nl)) return NLUnderscore;
+        // else fall through
+    case NLUnderscore:
+        if (nlShowDone(nl)) return NLDone;
+        // else fall through
+    case NLDone:
+        if (nlShowDigits(nl)) return NLZero;
+        return NLA;
+    default:
+        if (nli == nlGetMax(nl))
+            return nlIncrement(nl, NLMinus);
+        if (nli == NLMinus)
+            // nothing to show
+            return NLMinus;
+        return nli + 1;
     }
+}
+
+static NumberLayerItem nlDecrement(NumberLayer *nl, NumberLayerItem nli) {
+    switch (nli) {
+    case NLA:
+        if (nlShowDigits(nl)) return NLNine;
+        // else fall through
+    case NLZero:
+        if (nlShowDone(nl)) return NLDone;
+        // else fall through
+    case NLDone:
+        if (nlShowUnderscore(nl)) return NLUnderscore;
+        // else fall through
+    case NLUnderscore:
+        if (nlShowDecimalPoint(nl)) return NLPoint;
+        // else fall through
+    case NLPoint:
+        return nlGetMax(nl);
+    default:
+        return nli - 1;
+    }
+}
+
+void number_layer_select(NumberLayer *nl, bool up) {
+    nl->current = (up ? nlIncrement : nlDecrement)(nl, nl->current);
     layer_mark_dirty(nl->l);
 }
 
-void number_layer_set_negative(NumberLayer *nl, bool neg) { 
+void number_layer_set_negative(NumberLayer *nl, bool neg) {
     nl->negative = neg;
     layer_mark_dirty(nl->l);
 }
@@ -325,4 +332,3 @@ static void nlBackClick(ClickRecognizerRef recognizer, void *context) {
 void number_layer_set_click_config_onto_window(NumberLayer *nl, struct Window *window) {
     window_set_click_config_provider_with_context(window, nlClickConfig, nl);
 }
-

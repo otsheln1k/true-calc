@@ -9,6 +9,10 @@ double pow_di(double b, int p);
 struct NumberLayer;
 typedef struct NumberLayer NumberLayer;
 
+/*
+ * not so sure why we need NLMinus
+ * it’s useful, however, as the lower bound
+ */
 typedef enum {
     // NLZero = 0, NLNine = 9, NLPoint = 10, NLDone = 11, NLMinus = 12
     NLMinus = 0, NLPoint = 1, NLUnderscore = 2, NLDone = 3, NLZero = 4, NLNine = 13, NLA = 14, NLZ = 39
@@ -24,7 +28,7 @@ struct NumberLayer {
     struct list_head *items;        // reversed struct list_head *of NumberLayerItem
     nlCallback done_cb;
     nlCallback cncl_cb;
-    NumberLayerItem current; 
+    NumberLayerItem current;
     void *cb_ctx;
 };
 
@@ -65,4 +69,3 @@ void number_layer_set_callback_context(NumberLayer *, void *);
 void number_layer_set_click_config_onto_window(NumberLayer *, struct Window *);  // here
 
 #endif
-

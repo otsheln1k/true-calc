@@ -63,7 +63,7 @@ struct calc_state {
     struct list_head *expr;
     // expectations
     enum token_exp exp;
-    unsigned int nesting; 
+    unsigned int nesting;
     char *str;
     // string buffer size
     // TODO: remove

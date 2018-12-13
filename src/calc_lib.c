@@ -25,7 +25,7 @@ PREDEF_ONELINE_FUNC(predef_tan, args, argv,
 
 
 // TRIGLIB
-    
+
 static void triglib_load(struct eval_state *e) {
     FUNCDEF_ARGS(e, "sin", 1, { "a_rad" }, predef_sin);
     FUNCDEF_ARGS(e, "cos", 1, { "a_rad" }, predef_cos);

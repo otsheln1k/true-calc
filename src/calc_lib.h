@@ -12,12 +12,13 @@
  * const_load(), const_save(c)
  */
 void init_triglib(struct eval_state *e);
-void init_constlib(struct eval_state *e);
 
 /*
-void cl_const_load();
-
-void cl_const_save();
-*/
+ * Loads:
+ * - save_cst
+ * - load_cst
+ * - clear_cst
+ */
+void init_constlib(struct eval_state *e);
 
 #endif

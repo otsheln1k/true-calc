@@ -247,4 +247,3 @@ void item_menu_destroy(ItemMenuLayer *im) {
     layer_destroy(im->l);
     free(im);
 }
-

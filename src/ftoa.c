@@ -19,11 +19,11 @@ static int get_digit(double *d_rw, double p10,
                      int add_round_next_p)
 {
     double d = *d_rw, head, next;
-    
+
     head = trunc(d / p10);
     d -= head * p10;
     next = d / p10;
-    
+
     if (FP_EQ(next, 1.0)) {
         head += 1.0;
         next = 0.0;
@@ -59,17 +59,17 @@ void ftoa(double d, char *buf, size_t num)
     // exponent is at most 3 digits (2^128 ≈ 10^38)
     int expt = 0;
     double p10 = 1.0;
-    
+
     int is_negative = FP_LT(d, 0.0);
     int is_expt_0;
     int is_expt_g10;
     int is_expt_neg;
-    
+
     size_t expt_width;
     size_t normal_width;
     size_t zero_count;
     size_t chars = num - 1;
-    
+
     char *pos = buf;
 
     if (num < 2) return;

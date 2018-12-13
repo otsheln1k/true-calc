@@ -335,4 +335,3 @@ int main() {
     app_event_loop();
     destroy_app();
 }
-

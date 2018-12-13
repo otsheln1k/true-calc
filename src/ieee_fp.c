@@ -48,7 +48,7 @@ double ieee_trunc(double x)
         shape.number.fraction3 &= ~NBITS(52 - exp);
         goto clear_0;
     }
-    
+
  clear_3: shape.number.fraction1 = 0;
  clear_2: shape.number.fraction2 = 0;
  clear_1: shape.number.fraction3 = 0;
@@ -142,7 +142,7 @@ double ieee_fmod(double x, double y)
 {
     double k = x / y;
     double tk = ieee_trunc(k);
-    
+
     if (ieee_fabs(k - tk) >= 1 - EPS) {
         return ieee_copysign(0.0, x);
     }

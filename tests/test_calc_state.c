@@ -527,7 +527,7 @@ bool test_cs_Var() {
 
     FINAL_ASSERT(res, (cs->exp & TEAssign) == TEAssign, t_c_Var,
                  fprintf(stderr, "expectations: %#x\n", cs->exp));
-    
+
     cs_interact(cs, TIIAssign);
     cs_interact(cs, TIINumber);
     cs_input_number(cs, 12.5);

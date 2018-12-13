@@ -61,4 +61,3 @@ Layer *item_menu_get_layer(ItemMenuLayer *im);
 ScrollLayer *item_menu_get_scroll_layer(ItemMenuLayer *im);
 
 #endif
-

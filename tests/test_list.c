@@ -50,7 +50,7 @@ t_a_SI_ret:
 }
 
 bool test_array_ConvSlice() {
-    struct list_head *arr = convertedList((int[6]){15, 32, 2, 28, 90, 42}, 6, sizeof(int));
+    struct list_head *arr = listFromArray((int[6]){15, 32, 2, 28, 90, 42}, 6, sizeof(int));
     if (!ASSERT(arr->length == 6)
      || !ASSERT(GET_INT(arr, 3) == 28)) {
         bool res = false;
@@ -74,13 +74,13 @@ typedef struct {
 } SType;
 
 bool test_array_ConvEx() {
-    struct list_head *stringarr = convertedList((char*[3]){ "abc", "def", "ghi" }, 3, sizeof(char *));
+    struct list_head *stringarr = listFromArray((char*[3]){ "abc", "def", "ghi" }, 3, sizeof(char *));
     if (!ASSERT(strcmp(LIST_REF(char *, stringarr, 1), "def") == 0)) {
         printf("%s\n", LIST_REF(char *, stringarr, 1));
         bool res = false;
         goto t_a_CE_ret_1;
     }
-    struct list_head *structarr = convertedList((SType[4]){ { 1, 1.2 }, { 2, 2.2 }, { 3, 3.2 }, { 4, 4.2 } }, 4, sizeof(SType));
+    struct list_head *structarr = listFromArray((SType[4]){ { 1, 1.2 }, { 2, 2.2 }, { 3, 3.2 }, { 4, 4.2 } }, 4, sizeof(SType));
     if (!(ASSERT(LIST_DATA(SType, structarr, 2)->f == 3.2)
           && ASSERT(LIST_DATA(SType, structarr, 1)->i == 2))) {
         bool res = false;
@@ -100,9 +100,9 @@ t_a_CE_ret_1:
 
 bool test_array_2dim() {
     struct list_head *arr = makeList(sizeof(struct list_head *));
-    struct list_head *a01 = convertedList((int[6]){0, 1, 2, 3, 4, 5}, 6, sizeof(int));
+    struct list_head *a01 = listFromArray((int[6]){0, 1, 2, 3, 4, 5}, 6, sizeof(int));
     listAppend(arr, &a01);
-    struct list_head *a02 = convertedList((int[6]){7, 8, 9, 10, 11, 12}, 6, sizeof(int));
+    struct list_head *a02 = listFromArray((int[6]){7, 8, 9, 10, 11, 12}, 6, sizeof(int));
     listAppend(arr, &a02);
     bool res = \
            ASSERT(GET_INT(GET_LIST(arr, 0), 2) == 2)
@@ -115,7 +115,7 @@ bool test_array_2dim() {
 }
 
 bool test_array_NextItem() {
-    struct list_head *arr = convertedList((int[6]){0, 1, 2, 3, 4, 5}, 6, sizeof(int));
+    struct list_head *arr = listFromArray((int[6]){0, 1, 2, 3, 4, 5}, 6, sizeof(int));
     int *item2 = LIST_DATA(int, arr, 2);
     int *item3 = getListNextItem(item2);
     bool res = \
@@ -126,7 +126,7 @@ bool test_array_NextItem() {
 }
 
 bool test_array_For() {
-    struct list_head *arr = convertedList((int[6]){ 15, -1, 42, 146, 2, 0 }, 6, sizeof(int));
+    struct list_head *arr = listFromArray((int[6]){ 15, -1, 42, 146, 2, 0 }, 6, sizeof(int));
     unsigned int i = 0;
     bool res = false;
     FOR_LIST_COUNTER(arr, idx, int, itm) {
@@ -145,7 +145,7 @@ t_a_F_ret:
 }
 
 bool test_array_Copy() {
-    struct list_head *arr0 = convertedList((int [6]){ 5, 2, 41, -1, 0, 66 }, 6, sizeof(int));
+    struct list_head *arr0 = listFromArray((int [6]){ 5, 2, 41, -1, 0, 66 }, 6, sizeof(int));
     struct list_head *arr1 = listCopy(LIST_TAIL(arr0, 2));
     int i = 42;
     setListItemValue(arr0, 2, &i);
@@ -161,7 +161,7 @@ bool test_array_Copy() {
 }
 
 bool test_array_Detach() {
-    struct list_head *arr = convertedList((int[6]){ 1, 2, 3, 0, -1, -2 }, 6, sizeof(int));
+    struct list_head *arr = listFromArray((int[6]){ 1, 2, 3, 0, -1, -2 }, 6, sizeof(int));
     struct list_head *slc = LIST_TAIL(arr, 3);
     int i = -3;
     setListItemValue(arr, 3, &i);

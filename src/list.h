@@ -30,17 +30,17 @@ typedef int (*listIterFunc)(struct list_head *arr,
     listSlice((arr), (stt), (arr)->length)
 
 #define LIST_CONV(type, count, items)                           \
-    convertedList(((type[count])items), (count), sizeof(type))
+    listFromArray(((type[count])items), (count), sizeof(type))
 
 struct list_head *makeList(size_t elt_size);
 struct list_item *makeListItem(size_t elt_size);
 struct list_head *takeListItems(struct list_item *first,
                                 size_t len,
                                 size_t elt_size);
-struct list_head *convertedList(void *carray,
+struct list_head *listFromArray(void *carray,
                                 size_t len,
                                 size_t elt_size);
-void *listJoint(struct list_head * arr);
+void *listToArray(struct list_head * arr);
 struct list_item *destroyList(struct list_head *arr);
 void destroyListHeader(struct list_head *slc);
 void listAlias(struct list_head *dest, struct list_head *src);
@@ -154,14 +154,5 @@ static inline void *getListItemByVal(struct list_head *arr, void *data)
     return NULL;
 }
 
-
-// NOTES
-
-// listSlice shared contents with its original // TODO
-// listPart: slice, actually removes data
-// listDetached: keep head, copy contents
-// listCopy: copy both
-// convertedList: c-struct list_head *-> linked-list
-// listJoint: linked-list -> c-// TODO
 
 #endif

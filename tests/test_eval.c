@@ -18,8 +18,8 @@ bool test_eval_vars() {  // more tests!
 
 bool test_eval_funcall() {
     unsigned int fid0 = add_func("f");
-    set_func_args(fid0, convertedList((char*[1]){ "a" }, 1, sizeof(char *)));
-    set_func_body(fid0, convertedList((Token[3]){ { Arg, 0 }, { Operator, { .op = OAdd } }, { Number, 10 } }, 3, sizeof(Token)));
+    set_func_args(fid0, listFromArray((char*[1]){ "a" }, 1, sizeof(char *)));
+    set_func_body(fid0, listFromArray((Token[3]){ { Arg, 0 }, { Operator, { .op = OAdd } }, { Number, 10 } }, 3, sizeof(Token)));
     struct list_head *arg0 = LIST_CONV(Token, 1, ARG({ { Number, 32.0 } }));
     struct list_head *argv = makeList(sizeof(struct list_head *));
     listAppend(argv, &arg0);
@@ -31,7 +31,7 @@ bool test_eval_funcall() {
 
 bool test_eval_expr1() {
     // ( 15. - 3. ) * 4.
-    struct list_head *tokens = convertedList((Token[7]){
+    struct list_head *tokens = listFromArray((Token[7]){
             { Operator, { .op = OLp } },
             { Number, 15. }, { Operator, { .op = OSub } }, { Number, 3. },
             { Operator, { .op = ORp } },
@@ -44,7 +44,7 @@ bool test_eval_expr1() {
 
 bool test_eval_assignExpr1() {
     unsigned int x_id = add_var(0., "x");
-    struct list_head *tokens = convertedList((Token[5]){
+    struct list_head *tokens = listFromArray((Token[5]){
             { Var, { .id = x_id } },
             { Operator, { .op = OAssign } },
             { Number, 15. }, { Operator, { .op = OTDiv } }, { Number, 2. } },
@@ -57,7 +57,7 @@ bool test_eval_assignExpr1() {
 
 bool test_eval_allArgs() {
     struct list_head *args = makeList(sizeof(struct list_head *));
-    struct list_head *arg0 = convertedList((Token[1]){ { Number, 3. } }, 1, sizeof(Token));
+    struct list_head *arg0 = listFromArray((Token[1]){ { Number, 3. } }, 1, sizeof(Token));
     listAppend(args, &arg0);
     struct list_head *argv = eval_all_args(args);
     bool res = ASSERT(argv->length == 1)
@@ -70,13 +70,13 @@ bool test_eval_allArgs() {
 
 bool test_eval_assignExpr2() {
     unsigned int f_id = add_func("f");
-    set_func_args(f_id, convertedList((char*[1]){ "x" }, 1, sizeof(char *)));
-    struct list_head *tokens0 = convertedList((Token[8]){
+    set_func_args(f_id, listFromArray((char*[1]){ "x" }, 1, sizeof(char *)));
+    struct list_head *tokens0 = listFromArray((Token[8]){
             { Func, { .id = f_id } }, { Operator, { .op = OLCall } }, { Arg, { .id = 0 } }, { Operator, { .op = ORCall } },
             { Operator, { .op = OAssign } },
             { Arg, { .id = 0 } }, { Operator, { .op = OMul } }, { Arg, { .id = 0 } } },
         8, sizeof(Token));
-    struct list_head *tokens1 = convertedList((Token[4]){
+    struct list_head *tokens1 = listFromArray((Token[4]){
             { Func, { .id = f_id } }, { Operator, { .op = OLCall } },
             { Number, 3. },
             { Operator, { .op = ORCall } } },

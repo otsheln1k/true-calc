@@ -39,9 +39,9 @@ struct list_head *takeListItems(struct list_item *head,
 
 
 
-// CONVERTING TO/FROM C LISTS
+// CONVERTING TO/FROM C ARRAYS
 
-struct list_head *convertedList(void *carray,
+struct list_head *listFromArray(void *carray,
                                 size_t len,
                                 size_t elt_size)
 {
@@ -61,12 +61,12 @@ struct list_head *convertedList(void *carray,
     return arr;
 }
 
-void *listJoint(struct list_head * arr)
+void *listToArray(struct list_head *lst)
 {
-    size_t len = arr->length;
-    void *a = calloc(len, arr->elt_size);
-    size_t elt_size = arr->elt_size;
-    struct list_item *item = arr->first;
+    size_t len = lst->length;
+    void *a = malloc(lst->elt_size * len);
+    size_t elt_size = lst->elt_size;
+    struct list_item *item = lst->first;
 
     for (size_t i = 0; i < len; i++) {
         memcpy(a + i * elt_size, item->data, elt_size);
@@ -79,16 +79,16 @@ void *listJoint(struct list_head * arr)
 
 // DESTRUCTORS
 
-struct list_item *destroyList(struct list_head *arr)
-{
-    struct list_item *item = listClear(arr);
-    free(arr);
-    return item;
-}
-
 void destroyListHeader(struct list_head *slc)
 {
     free(slc);
+}
+
+struct list_item *destroyList(struct list_head *lst)
+{
+    struct list_item *item = listClear(lst);
+    destroyListHeader(lst);
+    return item;
 }
 
 
@@ -100,27 +100,27 @@ void listAlias(struct list_head *dest,
     *dest = *src;
 }
 
-struct list_head *listSlice(struct list_head *arr,
+struct list_head *listSlice(struct list_head *lst,
                             size_t stt,
                             size_t end)
 {
-    return takeListItems(getListItem(arr, stt),
+    return takeListItems(getListItem(lst, stt),
                          end - stt,
-                         arr->elt_size);
+                         lst->elt_size);
 }
 
-struct list_item *listDetach(struct list_head *arr)
+struct list_item *listDetach(struct list_head *lst)
 {
     size_t idx = 0;
-    size_t len = arr->length;
+    size_t len = lst->length;
     struct list_item *previtm, *newitm, *itm;
 
-    for (itm = arr->first;
+    for (itm = lst->first;
          idx < len;
          previtm = newitm, idx++, itm = itm->next) {
-        newitm = makeListItem(arr->elt_size);
-        memcpy(newitm->data, itm->data, arr->elt_size);
-        *(idx ? &previtm->next : &arr->first) = newitm;
+        newitm = makeListItem(lst->elt_size);
+        memcpy(newitm->data, itm->data, lst->elt_size);
+        *(idx ? &previtm->next : &lst->first) = newitm;
     }
 
     return itm;
@@ -130,52 +130,46 @@ struct list_head *listCopy(struct list_head *original)
 {
     struct list_head *res = makeList(original->elt_size);
 
-    res->first = original->first;
-    res->length = original->length;
+    listAlias(res, original);
     listDetach(res);
 
     return res;
 }
 
-struct list_item *listPart(struct list_head *arr,
-                             size_t from,
-                             size_t to)
+struct list_item *listPart(struct list_head *lst,
+                           size_t from,
+                           size_t to)
 {
     if (from >= to)
-        return listClear(arr);
+        return listClear(lst);
 
-    size_t len = to - from;
-    struct list_head *slice;
-    struct list_item *itm, *after;
+    struct list_item *after;
 
     // remove tail
-    slice = listSlice(arr, to, arr->length);
-    after = destroyList(slice);
-    // remote head
-    slice = listSlice(arr, 0, from);
-    itm = destroyList(slice);
+    after = destroyList(listSlice(lst, to, lst->length));
 
-    arr->first = itm;
-    arr->length = len;
+    // remote head
+    lst->first = destroyList(listSlice(lst, 0, from));
+    lst->length = to - from;
 
     return after;
 }
 
-struct list_item *listReverse(struct list_head *arr)
+struct list_item *listReverse(struct list_head *lst)
 {
-    size_t len = arr->length;
+    size_t len = lst->length;
     if (len < 2)
-        return len ? arr->first->next : NULL;
+        return len ? lst->first->next : NULL;
 
-    struct list_item *origin = arr->first;
+    struct list_item *origin = lst->first;
     struct list_item *this;
     struct list_item *next;
 
     for (size_t idx = 1; idx < len; idx++) {
         this = origin->next;
         next = this->next;
-        this->next = arr->first;
-        arr->first = this;
+        this->next = lst->first;
+        lst->first = this;
         origin->next = next;
     }
 
@@ -198,36 +192,40 @@ static void swap_data(struct list_item *a,
     }
 }
 
-struct list_item *listReverseSaveLink(struct list_head *arr)
+/* Same, but swap the first and last elements' data
+ * to keep the old links to the first element of
+ * the list (or slice) valid.
+ */
+struct list_item *listReverseSaveLink(struct list_head *lst)
 {
     struct list_item *item;
     struct list_head *slice;
 
-    switch (arr->length) {
+    switch (lst->length) {
     case 0:
         return NULL;
     case 1:
-        return arr->first->next;
+        return lst->first->next;
     case 2:
-        item = arr->first->next;
+        item = lst->first->next;
         break;
     default:
-        slice = listSlice(arr, 1, arr->length - 1);
+        slice = listSlice(lst, 1, lst->length - 1);
         item = listReverse(slice);
-        arr->first->next = slice->first;
+        lst->first->next = slice->first;
         destroyListHeader(slice);
         break;
     }
 
-    swap_data(item, arr->first, arr->elt_size);
+    swap_data(item, lst->first, lst->elt_size);
 
     return item->next;
 }
 
-struct list_item *listClear(struct list_head *arr)
+struct list_item *listClear(struct list_head *lst)
 {
-    size_t i = arr->length;
-    struct list_item *item = arr->first, *next;
+    size_t i = lst->length;
+    struct list_item *item = lst->first, *next;
 
     while (i--) {
         next = item->next;
@@ -235,8 +233,8 @@ struct list_item *listClear(struct list_head *arr)
         item = next;
     }
 
-    arr->length = 0;
-    arr->first = NULL;
+    lst->length = 0;
+    lst->first = NULL;
 
     return item;
 }
@@ -244,114 +242,105 @@ struct list_item *listClear(struct list_head *arr)
 
 // ITEMS
 
-struct list_item *getListItem(struct list_head *arr, size_t index)
+struct list_item *getListItem(struct list_head *lst, size_t index)
 {
-    if (index >= arr->length)
+    if (index >= lst->length)
         return NULL;
 
-    struct list_item *item = arr->first;
+    struct list_item *item = lst->first;
 
     for (size_t i = 0; i < index; i++, item = item->next);
 
     return item;
 }
 
-struct list_item *listAppend(struct list_head * arr, void *elt)
+struct list_item *listInsert(struct list_head *lst,
+                             size_t index,
+                             void *elt)
 {
-    size_t len = arr->length;
-    struct list_item *item = makeListItem(arr->elt_size);
+    size_t len = lst->length;
+    if (index > len)
+        return NULL;
 
-    if (item == NULL) return NULL;
+    struct list_item *new_item = makeListItem(lst->elt_size);
+    if (new_item == NULL)
+        return NULL;
 
-    arr->length += 1;
-
-    *(len ? &getListItem(arr, len - 1)->next : &arr->first) = item;
-    memcpy(item->data, elt, arr->elt_size);
-
-    return item;
-}
-
-struct list_item *listInsert(struct list_head *arr,
-                               size_t index,
-                               void *elt)
-{
-    size_t len = arr->length;
-    if (index > len) return NULL;
-
-    struct list_item *new_item = makeListItem(arr->elt_size);
-    if (new_item == NULL) return NULL;
-
-    struct list_item *prev = index
-        ? getListItem(arr, index - 1) : NULL;
-    struct list_item *next = (index == len)
-        ? NULL : (index ? prev->next : arr->first);
+    struct list_item *prev = index ? getListItem(lst, index - 1) : NULL;
+    struct list_item *next = index ? prev->next : lst->first;
 
     new_item->next = next;
-    *(index ? &prev->next : &arr->first) = new_item;
+    *(index ? &prev->next : &lst->first) = new_item;
 
-    memcpy(new_item->data, elt, arr->elt_size);
-    arr->length += 1;
+    memcpy(new_item->data, elt, lst->elt_size);
+    lst->length += 1;
 
     return new_item;
 }
 
-struct list_item *listPush(struct list_head *arr, void *elt)
+struct list_item *listAppend(struct list_head *lst, void *elt)
 {
-    return listInsert(arr, 0, elt);
+    return listInsert(lst, lst->length, elt);
 }
 
-struct list_item *listPop(struct list_head *arr, size_t index)
+// REMOVE?
+struct list_item *listPush(struct list_head *lst, void *elt)
 {
-    size_t len = arr->length;
+    return listInsert(lst, 0, elt);
+}
+
+struct list_item *listPop(struct list_head *lst, size_t index)
+{
+    size_t len = lst->length;
     if (index >= len) return NULL;
 
     struct list_item *prev_item =
-        index ? getListItem(arr, index - 1) : NULL;
-    struct list_item *item = index ? prev_item->next : arr->first;
+        index ? getListItem(lst, index - 1) : NULL;
+    struct list_item *item = index ? prev_item->next : lst->first;
     struct list_item *next_item = (index < len - 1)
         ? item->next : NULL;
-    *(index ? &prev_item->next : &arr->first) = next_item;
-    arr->length -= 1;
+    *(index ? &prev_item->next : &lst->first) = next_item;
+    lst->length -= 1;
     return item;
 }
 
-void listRemove(struct list_head *arr, size_t index)
+void listRemove(struct list_head *lst, size_t index)
 {
-    free(listPop(arr, index));
+    free(listPop(lst, index));
 }
 
 
 // ITERATION AND SEARCHING
 
-void listIter(struct list_head *arr,
-               listIterFunc f,
-               void *user_data)
+void listIter(struct list_head *lst,
+              listIterFunc f,
+              void *user_data)
 {
-    if (!arr->length) return;
+    if (!lst->length) return;
 
-    struct list_item *item = arr->first;
+    struct list_item *item = lst->first;
     struct list_item *nitem;
 
-    for (size_t i = 0; i < arr->length; i++) {
+    for (size_t i = 0; i < lst->length; i++) {
         nitem = item->next;
-        if (f(arr, i, item, user_data))
+        if (f(lst, i, item, user_data))
             break;
         item = nitem;
     }
 }
 
-struct list_item *findListItem(struct list_head *arr,
-                                 listIterFunc predicate,
-                                 void *user_data,
-                                 size_t *idx_return)
+struct list_item *findListItem(struct list_head *lst,
+                               listIterFunc predicate,
+                               void *user_data,
+                               size_t *idx_return)
 {
     struct list_item *itm;
     size_t idx;
 
-    FOR_LIST(arr, idx, itm)
+    FOR_LIST(lst, idx, itm)
         if ((predicate != NULL)
-            ? predicate(arr, idx, itm, user_data)
-            : !memcmp(itm->data, user_data, arr->elt_size)) {
+            ? predicate(lst, idx, itm, user_data)
+            : !memcmp(itm->data, user_data, lst->elt_size)) {
             if (idx_return) *idx_return = idx;
             return itm;
         }

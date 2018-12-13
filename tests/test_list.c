@@ -32,15 +32,16 @@ bool test_array_AppendGet() {
 
 bool test_array_SetInsert() {
     struct list_head *arr = makeList(sizeof(int));
+    bool res = true;
     listAppendInt(arr, 42);
     listAppendInt(arr, 0);
     listInsertInt(arr, 1, 100500);
     if (!ASSERT(GET_INT(arr, 1) == 100500)) {
-        bool res = false;
+        res = false;
         goto t_a_SI_ret;
     }
     listSetInt(arr, 2, 15);
-    bool res = \
+    res = \
            ASSERT(GET_INT(arr, 2) == 15)
         && ASSERT(GET_INT(arr, 1) == 100500)
         && ASSERT(GET_INT(arr, 0) == 42);
@@ -51,13 +52,14 @@ t_a_SI_ret:
 
 bool test_array_ConvSlice() {
     struct list_head *arr = listFromArray((int[6]){15, 32, 2, 28, 90, 42}, 6, sizeof(int));
+    bool res = true;
     if (!ASSERT(arr->length == 6)
      || !ASSERT(GET_INT(arr, 3) == 28)) {
-        bool res = false;
+        res = false;
         goto t_a_CS_ret;
     }
     struct list_head *slc = listSlice(arr, 1, 4);
-    bool res = \
+    res = \
            ASSERT(slc->length == 3)
         && ASSERT(GET_INT(slc, 0) == 32)
         && ASSERT(GET_INT(slc, 1) == 2)
@@ -75,18 +77,19 @@ typedef struct {
 
 bool test_array_ConvEx() {
     struct list_head *stringarr = listFromArray((char*[3]){ "abc", "def", "ghi" }, 3, sizeof(char *));
+    bool res = true;
     if (!ASSERT(strcmp(LIST_REF(char *, stringarr, 1), "def") == 0)) {
         printf("%s\n", LIST_REF(char *, stringarr, 1));
-        bool res = false;
+        res = false;
         goto t_a_CE_ret_1;
     }
     struct list_head *structarr = listFromArray((SType[4]){ { 1, 1.2 }, { 2, 2.2 }, { 3, 3.2 }, { 4, 4.2 } }, 4, sizeof(SType));
     if (!(ASSERT(LIST_DATA(SType, structarr, 2)->f == 3.2)
           && ASSERT(LIST_DATA(SType, structarr, 1)->i == 2))) {
-        bool res = false;
+        res = false;
         goto t_a_CE_ret_2;
     }
-    bool res = \
+    res = \
            ASSERT(stringarr->length == 3)
         && ASSERT(structarr->length == 4);
 t_a_CE_ret_2:
@@ -163,19 +166,20 @@ bool test_array_Copy() {
 bool test_array_Detach() {
     struct list_head *arr = listFromArray((int[6]){ 1, 2, 3, 0, -1, -2 }, 6, sizeof(int));
     struct list_head *slc = LIST_TAIL(arr, 3);
+    bool res = true;
     int i = -3;
     setListItemValue(arr, 3, &i);
     if (!(ASSERT(GET_INT(arr, 3) == GET_INT(slc, 0))
        && ASSERT(GET_INT(arr, 4) == GET_INT(slc, 1))
        && ASSERT(GET_INT(arr, 5) == GET_INT(slc, 2)))) {
-        bool res = false;
+        res = false;
         destroyListHeader(slc);
         goto t_a_D_ret;
     }
     listDetached(slc);
     i = -4;
     setListItemValue(arr, 5, &i);
-    bool res = \
+    res = \
             ASSERT(GET_INT(arr, 3)==GET_INT(slc, 0))
          && ASSERT(GET_INT(arr, 4)==GET_INT(slc, 1))
          && ASSERT(GET_INT(arr, 5) + 2 == GET_INT(slc, 2));

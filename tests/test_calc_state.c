@@ -123,23 +123,24 @@ bool test_cs_InteractiveVar() {
 
 bool test_cs_Nesting() {
     struct calc_state *cs = cs_create();
+    bool res = true;
     default_eval_state = &cs->e;
     cs_interact(cs, TIILParen);
-    if (!ASSERT(cs->nesting == 1)) { bool res = false; goto t_c_N_ret; }
+    if (!ASSERT(cs->nesting == 1)) { res = false; goto t_c_N_ret; }
     cs_interact(cs, TIINumber);
     cs_input_number(cs, 15.5);
     cs_interact(cs, TIIMinus);
     cs_interact(cs, TIINumber);
     cs_input_number(cs, 1.5);
     cs_interact(cs, TIIRParen);
-    if (!ASSERT(cs->nesting == 0)) { bool res = false; goto t_c_N_ret; }
+    if (!ASSERT(cs->nesting == 0)) { res = false; goto t_c_N_ret; }
     cs_interact(cs, TIIBackspace);
-    if (!ASSERT(cs->nesting == 1)) { bool res = false; goto t_c_N_ret; }
+    if (!ASSERT(cs->nesting == 1)) { res = false; goto t_c_N_ret; }
     cs_interact(cs, TIIRParen);
     cs_interact(cs, TIIMultiply);
     cs_interact(cs, TIINumber);
     cs_input_number(cs, 3.);
-    bool res = ASSERT(cs_eval(cs) == 42.);
+    res = ASSERT(cs_eval(cs) == 42.);
 t_c_N_ret:
     cs_destroy(cs);
     return res;
@@ -147,6 +148,7 @@ t_c_N_ret:
 
 bool test_cs_Stack() {
     struct calc_state *cs = cs_create();
+    bool res = true;
     default_eval_state = &cs->e;
     unsigned fid = set_func_func(set_func_args(add_func("tf1+"),
                                                LIST_CONV(char *, 2, ARG({ "x", "y" }))),
@@ -154,7 +156,7 @@ bool test_cs_Stack() {
     cs_interact(cs, TIIFunction);
     cs_input_id(cs, fid);
     cs_interact(cs, TIILFuncall);
-    bool res = ASSERT(cs->fcalls->length == 1);
+    res = ASSERT(cs->fcalls->length == 1);
     if (!res) goto t_c_S_ret;
     struct funcall_mark *fmp =
         LIST_DATA(struct funcall_mark, cs->fcalls, 0);
@@ -179,6 +181,7 @@ t_c_S_ret:
 
 bool test_cs_Scope() {
     struct calc_state *cs = cs_create();
+    bool res = true;
     default_eval_state = &cs->e;
     cs_interact(cs, TIIFunction);
     unsigned int fid1 = add_func("newf");
@@ -187,9 +190,9 @@ bool test_cs_Scope() {
     cs_interact(cs, TIIAddArg);
     cs_interact(cs, TIIRFuncall);
     cs_interact(cs, TIIAssign);
-    bool res = ASSERT(cs->scope.fid == fid1)
-            && ASSERT(cs->scope.offset == 5)
-            && ASSERT(cs->scope.nesting_level == 0);
+    res = ASSERT(cs->scope.fid == fid1)
+        && ASSERT(cs->scope.offset == 5)
+        && ASSERT(cs->scope.nesting_level == 0);
     if (!res) goto t_c_Sc_ret;
     cs_interact(cs, TIIArg);
     cs_input_id(cs, 0);

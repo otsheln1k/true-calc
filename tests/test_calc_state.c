@@ -16,13 +16,13 @@ bool test_cs_1() {
     cs_add_item(cs, (Token){ Number, 15 });
     cs_add_item(cs, (Token){ Operator, { .op = OAdd } });
     cs_add_item(cs, (Token){ Number, 27 });
-    bool res = ASSERT(eval_expr(cs_get_expr(cs), 0) == 42.)
+    bool res = ASSERT(eval_expr(cs_get_rev_expr(cs), 0) == 42.)
             && ASSERT(!strcmp(cs_curr_str(cs), "15+27"));
     if (!res)
         goto test_failed;
     cs_add_item(cs, (Token){ Operator, { .op = OTDiv } });
     cs_add_item(cs, (Token){ Number, 3. });
-    res &= ASSERT(eval_expr(cs_get_expr(cs), 0) == 24.)
+    res &= ASSERT(eval_expr(cs_get_rev_expr(cs), 0) == 24.)
         && ASSERT(!strcmp(cs_curr_str(cs), "15+27/3"));
 test_failed:
     cs_destroy(cs);
@@ -37,7 +37,7 @@ bool test_cs_2() {
     cs_add_item(cs, (Token){ Operator, { .op = OLCall } });
     cs_add_item(cs, (Token){ Number, 15 });
     cs_add_item(cs, (Token){ Operator, { .op = ORCall } });
-    bool res = ASSERT(eval_expr(cs_get_expr(cs), 0) == 25.)
+    bool res = ASSERT(eval_expr(cs_get_rev_expr(cs), 0) == 25.)
             && ASSERT(!strcmp(cs_curr_str(cs), "f1(15)"));
     cs_destroy(cs);
     return res;
@@ -53,7 +53,7 @@ bool test_cs_3() {
     cs_add_item(cs, (Token){ Var, { .id = vid } });
     cs_add_item(cs, (Token){ Operator, { .op = OMul } });
     cs_add_item(cs, (Token){ Const, { .id = cid } });
-    bool res = ASSERT(eval_expr(cs_get_expr(cs), 0) == 42.)
+    bool res = ASSERT(eval_expr(cs_get_rev_expr(cs), 0) == 42.)
             && ASSERT(get_var(vid) == 42.)
             && ASSERT(!strcmp(cs_curr_str(cs), "var_0=var_0*cst_0"));
     cs_destroy(cs);
@@ -91,7 +91,7 @@ bool test_cs_Interact() {
     cs_interact(cs, TIIPlus);
     cs_interact(cs, TIIVar);
     cs_input_id(cs, varid);
-    bool res = ASSERT(eval_expr(cs_get_expr(cs), 0) == 42.)
+    bool res = ASSERT(eval_expr(cs_get_rev_expr(cs), 0) == 42.)
             && ASSERT(!strcmp(cs_curr_str(cs), "27+var_1"));
     remove_var(varid);
     cs_destroy(cs);
@@ -438,7 +438,7 @@ int test_cs_Expect4() {
     for (size_t i = 0; i < len; i++) {
         cs_interact(cs, TIIBackspace);
         FINAL_ASSERT(res, cs->exp == exps[len - 1 - i], t_c_E4_ret,
-                     fprintf(stderr, "input#%zu\n", i));
+                     fprintf(stderr, "input#%zu (see: %#x)\n", i, cs->exp));
     }
 
  t_c_E4_ret:
@@ -497,6 +497,8 @@ bool test_cs_Args() {
     cs_interact(cs, TIIFunction);
     cs_input_newid(cs, "af");
     cs_interact(cs, TIILFuncall);
+    cs_interact(cs, TIIRFuncall);
+    cs_interact(cs, TIIBackspace);
     cs_interact(cs, TIIAddArg);
     cs_interact(cs, TIIBackspace);
     cs_interact(cs, TIIRFuncall);
@@ -509,8 +511,33 @@ bool test_cs_Args() {
     return res;
 }
 
+bool test_cs_Var() {
+    struct calc_state *cs = cs_create();
+    default_eval_state = &cs->e;
+    bool res = true;
+
+    cs_interact(cs, TIIVar);
+    cs_input_newid(cs, "v0");
+    cs_interact(cs, TIIBackspace);
+    cs_interact(cs, TIIVar);
+    cs_input_newid(cs, "v1");
+
+    FINAL_ASSERT(res, (cs->exp & TEAssign) == TEAssign, t_c_Var,
+                 fprintf(stderr, "expectations: %#x\n", cs->exp));
+    
+    cs_interact(cs, TIIAssign);
+    cs_interact(cs, TIINumber);
+    cs_input_number(cs, 12.5);
+
+    res &= ASSERT(cs_eval(cs) == 12.5);
+
+ t_c_Var:
+    cs_destroy(cs);
+    return res;
+}
+
 int main() {
-   bool res = test_cs_1()
+    bool res = test_cs_1()
         && test_cs_ftoa()
         && test_cs_2()
         && test_cs_3()
@@ -525,7 +552,8 @@ int main() {
         && test_cs_Generic1()
         && test_cs_Expect4()
         && test_cs_String()
-        && test_cs_Args();
+        && test_cs_Args()
+        && test_cs_Var();
     fprintf(stderr, res ? "All ok\n" : "Some tests failed\n");
     return !res;
 }

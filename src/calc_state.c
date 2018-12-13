@@ -1,29 +1,13 @@
 #include <stdio.h>
 #include <math.h>
 
+#define NEW_FOR_LIST
+
 #include "calc_state.h"
 #include "eval.h"
 #include "list.h"
 #include "ftoa.h"
 
-
-/* KNOWN BUGS */
-
-/*
- * We could push tokens to head; then reverse and evaluate
- * All code that will be affected is marked:
- * // EXPR LIST ACCESS
- */
-
-/*
- * The eval context should be kept inside
- * the calc state.
- * See:
- * // EVAL
- */
-
-
-/* NOT-YET-KNOWN BUGS */
 
 void cs_call_cb(struct calc_state *cs) {
     if (!(cs->no_cb) && cs->callback != NULL)
@@ -141,6 +125,7 @@ struct calc_state *cs_create() {
     cs->expr = makeList(sizeof(struct token));
     cs->callback = NULL;
     cs->eval_cb = NULL;
+    cs->final_eval = 0;
     cs->fcalls = makeList(sizeof(struct funcall_mark));
     cs->names = makeList(sizeof(struct new_name_mark));
     cs->symbols = makeList(sizeof(char *));
@@ -153,9 +138,12 @@ struct calc_state *cs_create() {
 
 double cs_eval(struct calc_state *cs) {
     listClear(cs->names);
-    // EXPR LIST ACCESS
-    // just reverse the list
-    double res = eval_expr_es(&cs->e, cs_get_expr(cs));
+    struct list_head *expr = cs->final_eval
+        ? cs->expr : listCopy(cs->expr);
+    listReverse(expr);
+    double res = eval_expr_es(&cs->e, expr);
+    if (!cs->final_eval)
+        destroyList(expr);
     if (cs->eval_cb != NULL)
         cs->eval_cb(cs, res);
     return res;
@@ -214,7 +202,9 @@ void cs_remove_symbol(struct calc_state *cs, char *sym) {
 
     FOR_LIST_ITEMS(cs->symbols, idx, current) {
         if (LIST_ITEM_REF(char *, current) == sym) {
-            *(prev ? &prev->next : &cs->symbols->first) = current->next;
+            *((prev != NULL) ? &prev->next : &cs->symbols->first)
+                = current->next;
+            cs->symbols->length -= 1;
             free(current);
             break;
         }
@@ -260,7 +250,7 @@ enum token_exp _cs_update_expect(struct calc_state *cs,
 {
     enum token_exp more = 0;
 
-    if (!new_tok_p)
+    if (new_tok_p == NULL)
         return TEValue;
 
     switch (new_tok_p->type) {
@@ -443,8 +433,7 @@ void cs_add_item(struct calc_state *cs, struct token new_tok) {
         case OLCall: {
             struct funcall_mark fm;
             fm.nesting_level = cs->nesting;
-            // EXPR LIST ACCESS
-            fm.fid = GET_PTOKEN(cs->expr, cs->expr->length - 1)->value.id;
+            fm.fid = GET_PTOKEN(cs->expr, 0)->value.id;
             fm.arg_idx = 0;
             listPush(cs->fcalls, &fm);
 
@@ -483,8 +472,7 @@ void cs_add_item(struct calc_state *cs, struct token new_tok) {
         cs->subexpr = SUBEXPR_LVALUE;
     }
 
-    // EXPR LIST ACCESS
-    listAppend(cs->expr, &new_tok);
+    listPush(cs->expr, &new_tok);
     cs_update_expect(cs, &new_tok);
     const char *s = cs_get_token_text(cs, &new_tok);
     cs->str_len += strlen(s);
@@ -516,17 +504,15 @@ static inline int begins_subexpr(struct token *token)
 void cs_rem_item(struct calc_state *cs) {
     // note: this is the *new* length
     unsigned int len = cs->expr->length - 1;
-    // EXPR LIST ACCESS
-    struct token *t = GET_PTOKEN(cs->expr, len);
+    struct token *t = GET_PTOKEN(cs->expr, 0);
     size_t slen = strlen(cs_get_token_text(cs, t));
 
-    // EXPR LIST ACCESS
     if (len == 0
-        || begins_subexpr(GET_PTOKEN(cs->expr, len - 1)))
+        || begins_subexpr(GET_PTOKEN(cs->expr, 1)))
         cs->subexpr = SUBEXPR_BEGIN;
     else if (len >= 2
-             && GET_PTOKEN(cs->expr, len - 1)->type == Var
-             && begins_subexpr(GET_PTOKEN(cs->expr, len - 2)))
+             && GET_PTOKEN(cs->expr, 1)->type == Var
+             && begins_subexpr(GET_PTOKEN(cs->expr, 2)))
         cs->subexpr = SUBEXPR_LVALUE;
     else
         cs->subexpr = SUBEXPR_NOT_LVALUE;
@@ -559,19 +545,47 @@ void cs_rem_item(struct calc_state *cs) {
             break;
         case ORCall: {
             struct funcall_mark fm;
+            size_t tindex;
+            struct list_item *item;
+            struct token *token, *prev = NULL;
+            unsigned int nesting = cs->nesting;
+
+            /* find beginning of funcall */
+
             fm.nesting_level = cs->nesting + 1;
-            // TODO: rewrite
-            // EXPR LIST ACCESS
-            // wtf?
-            FOR_LIST_COUNTER(cs->expr, tindex, struct token, token) {
-                if (token->type == Func) {
-                    struct token *ntoken = getListNextItem(token);
-                    if (ntoken->type == Operator && ntoken->value.op == OLCall) {
-                        fm.fid = token->value.id;
-                        fm.arg_idx = 0;
-                    }
-                } else if (token->type == Operator && token->value.op == OComma)
+            fm.arg_idx = 0;
+            FOR_LIST(cs->expr, tindex, item) {
+                token = LIST_ITEM_DATA(struct token, item);
+
+                if (nesting == fm.nesting_level - 1
+                    && token->type == Func
+                    && prev != NULL
+                    && prev->type == Operator
+                    && prev->value.op == OLCall) {
+                    fm.fid = token->value.id;
+                    break;
+                } else if (nesting == fm.nesting_level
+                           && token->type == Operator
+                           && token->value.op == OComma) {
                     fm.arg_idx += 1;
+                }
+
+                if (token->type == Operator) {
+                    switch (token->value.op) {
+                    case ORp:
+                    case ORCall:
+                        nesting += 1;
+                        break;
+                    case OLp:
+                    case OLCall:
+                        nesting -= 1;
+                        break;
+                    default:
+                        break;
+                    }
+                }
+
+                prev = token;
             }
             listPush(cs->fcalls, &fm);
         } // intentionally fall through
@@ -614,16 +628,11 @@ void cs_rem_item(struct calc_state *cs) {
 
     cs->str_len -= slen;
     cs->str[cs->str_len - 1] = 0;
-    // EXPR LIST ACCESS
-    listRemove(cs->expr, len);
-    cs->exp = TEValue;
-    // re-expect
-    // EXPR LIST ACCESS
-    // wtf?
-    // TODO: well, I guess it will be easier
-    FOR_LIST_COUNTER(cs->expr, idx, struct token, tok)
-        cs_update_expect(cs, tok);
-    // callback
+    listRemove(cs->expr, 0);
+    if (cs->expr->length)
+        cs_update_expect(cs, GET_PTOKEN(cs->expr, 0));
+    else
+        cs->exp = TEValue;
     cs_call_cb(cs);
 }
 
@@ -759,6 +768,11 @@ unsigned int cs_get_func_id(struct calc_state *cs) {
     return cs->scope.fid;
 }
 
-struct list_head *cs_get_expr(struct calc_state *cs) {
-    return cs->expr;
+struct list_head *cs_get_rev_expr(struct calc_state *cs) {
+    static struct list_head *expr = NULL;
+    if (expr != NULL)
+        destroyList(expr);
+    expr = listCopy(cs->expr);
+    listReverse(expr);
+    return expr;
 }

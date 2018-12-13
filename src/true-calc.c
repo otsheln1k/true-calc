@@ -351,8 +351,9 @@ void mlc_config(void *ctx) {  // CLICK-CONFIG
 
 void mw_load(Window *wnd) {
     calc_state = cs_create();
-    /* default_eval_state = &calc_state->e; */
     cs_set_cb(calc_state, cs_callback, cs_eval_cb);
+    /* we never reuse the expression */
+    calc_state->final_eval = 1;
 
     cl_lib_init(&calc_state->e);
     init_constlib(&calc_state->e);

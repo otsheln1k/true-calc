@@ -167,18 +167,35 @@ struct list_item *listReverse(struct list_head *arr)
     if (len < 2)
         return len ? arr->first->next : NULL;
 
-    struct list_item *this = arr->first->next;
+    struct list_item *origin = arr->first;
+    struct list_item *this;
     struct list_item *next;
 
     for (size_t idx = 1; idx < len; idx++) {
+        this = origin->next;
         next = this->next;
-        arr->first->next = this->next;
         this->next = arr->first;
         arr->first = this;
-        this = next;
+        origin->next = next;
     }
 
-    return this;
+    return origin->next;
+}
+
+static void swap_data(struct list_item *a,
+                      struct list_item *b,
+                      size_t elt_sz)
+{
+    unsigned char c;
+
+    unsigned char *ap = a->data;
+    unsigned char *bp = b->data;
+
+    for (size_t i = 0; i < elt_sz; i++) {
+        c = ap[i];
+        ap[i] = bp[i];
+        bp[i] = c;
+    }
 }
 
 struct list_item *listReverseSaveLink(struct list_head *arr)
@@ -202,11 +219,7 @@ struct list_item *listReverseSaveLink(struct list_head *arr)
         break;
     }
 
-    unsigned char tmp[arr->elt_size];
-
-    memcpy(tmp, item->data, arr->elt_size);
-    memcpy(item->data, arr->first->data, arr->elt_size);
-    memcpy(arr->first->data, tmp, arr->elt_size);
+    swap_data(item, arr->first, arr->elt_size);
 
     return item->next;
 }

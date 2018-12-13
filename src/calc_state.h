@@ -74,6 +74,8 @@ struct calc_state {
     calc_eval_cb eval_cb;
     // if 1, temporarily disables the callback
     int no_cb;
+    // if 1, the expression list is reversed in cs_eval
+    int final_eval;
     // funcall_mark list
     struct list_head *fcalls;
     unsigned int first_fid;
@@ -185,7 +187,7 @@ void cs_remove_unneeded(struct calc_state *cs);
 enum calc_input_type cs_get_input_type(struct calc_state *cs);
 char *cs_curr_str(struct calc_state *cs);
 unsigned int cs_get_func_id(struct calc_state *cs);
-struct list_head *cs_get_expr(struct calc_state *cs);
+struct list_head *cs_get_rev_expr(struct calc_state *cs);
 
 
 #define CALC_WITH_NO_CB(cs, body)               \

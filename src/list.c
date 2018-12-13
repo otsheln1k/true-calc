@@ -272,7 +272,8 @@ struct list_item *listInsert(struct list_head *lst,
     new_item->next = next;
     *(index ? &prev->next : &lst->first) = new_item;
 
-    memcpy(new_item->data, elt, lst->elt_size);
+    if (elt)
+        memcpy(new_item->data, elt, lst->elt_size);
     lst->length += 1;
 
     return new_item;
@@ -283,7 +284,6 @@ struct list_item *listAppend(struct list_head *lst, void *elt)
     return listInsert(lst, lst->length, elt);
 }
 
-// REMOVE?
 struct list_item *listPush(struct list_head *lst, void *elt)
 {
     return listInsert(lst, 0, elt);
